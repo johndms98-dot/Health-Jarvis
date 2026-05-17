@@ -1,0 +1,5 @@
+garminconnect
+myfitnesspal
+fastapi
+uvicorn
+python-dotenv

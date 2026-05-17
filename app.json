@@ -1,0 +1,36 @@
+{
+  "expo": {
+    "name": "Health Dashboard",
+    "slug": "health-dashboard",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0f172a"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.healthdashboard.app",
+      "infoPlist": {
+        "NSHealthShareUsageDescription": "Reads Apple Health data to supplement Garmin and Withings metrics in your personal health dashboard.",
+        "NSHealthUpdateUsageDescription": "Health Dashboard does not write to Apple Health."
+      }
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "react-native-health",
+        {
+          "healthSharePermission": "Reads Apple Health data for AI-powered health insights."
+        }
+      ]
+    ],
+    "scheme": "healthdashboard",
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
