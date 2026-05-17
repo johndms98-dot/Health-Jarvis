@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useHealthStore } from '../../src/store/healthStore';
-import { generateInsights } from '../../src/services/ClaudeService';
+import { generateInsights } from '../../src/services/LLMService';
 
 export default function InsightsScreen() {
   const { snapshots, latestInsight, setInsight } = useHealthStore();

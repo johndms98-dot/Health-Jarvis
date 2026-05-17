@@ -53,11 +53,12 @@ eas build --profile development --platform ios   # cloud build, ~10 min
 - `proxy/.env` — GITIGNORED. Copy from `proxy/.env.example` and fill in Garmin/MFP credentials.
 - Find your Mac's local IP: System Settings > Wi-Fi > Details > IP Address
 
-## Claude API Pattern
+## AI Insights (100% Free — Ollama)
 
-Uses `claude-sonnet-4-6` via direct HTTPS fetch. System prompt uses `cache_control: ephemeral`
-for prompt caching (same optimization as alpaca-trader `claude_strategy.py`).
-Sends last 7 days of HealthSnapshot[] as formatted plain text. See `src/services/ClaudeService.ts`.
+Uses `llama3.1:8b` via Ollama running locally on your Mac. Same model as alpaca-trader.
+The `/insights` POST endpoint on `garmin_proxy.py` calls `http://localhost:11434/api/generate`
+and returns the response. The app calls `GARMIN_PROXY/insights` — no API key needed.
+See `src/services/LLMService.ts` and the `generate_insights` endpoint in `proxy/garmin_proxy.py`.
 
 ## Withings Setup
 

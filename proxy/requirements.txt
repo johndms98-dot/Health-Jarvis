@@ -3,3 +3,4 @@ myfitnesspal
 fastapi
 uvicorn
 python-dotenv
+pydantic
