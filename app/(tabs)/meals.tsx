@@ -71,7 +71,7 @@ export default function MealsScreen() {
   const targets = adjustedTargets(goals, today?.activeCalories, today?.steps);
   const eaten = today?.caloriesConsumed ?? 0;
   const remaining = Math.max(targets.calories - eaten, 0);
-  const proteinRemaining = Math.max(targets.protein - (today?.proteinG ?? 0), 0);
+  const proteinRemaining = Math.max(targets.protein - (today?.proteinG ?? 0), 0).toFixed(1);
   const isHighActivity = (today?.activeCalories ?? 0) > 400 || (today?.steps ?? 0) > 10000;
 
   const suggestRecent = recentIngredients.filter(r => !ingredients.includes(r)).slice(0, 16);
