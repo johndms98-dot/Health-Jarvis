@@ -1,8 +1,14 @@
 import { MFP_PROXY } from '../../constants/Config';
 import { HealthSnapshot } from '../models/HealthSnapshot';
 
+function fetchWithTimeout(url: string, ms = 8000): Promise<Response> {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), ms);
+  return fetch(url, { signal: controller.signal }).finally(() => clearTimeout(id));
+}
+
 async function fetchJSON(path: string): Promise<any> {
-  const res = await fetch(`${MFP_PROXY}${path}`, { signal: AbortSignal.timeout(8000) });
+  const res = await fetchWithTimeout(`${MFP_PROXY}${path}`);
   if (!res.ok) throw new Error(`MFP proxy error ${res.status}`);
   return res.json();
 }
@@ -17,6 +23,7 @@ export interface MealBreakdown {
 
 export interface NutritionDay {
   date: string;
+  rawTotals: Record<string, number>;
   snapshot: Partial<HealthSnapshot>;
   meals: MealBreakdown[];
 }
@@ -26,6 +33,7 @@ export async function fetchNutrition(date: string): Promise<NutritionDay> {
   const t = raw.totals ?? {};
   return {
     date,
+    rawTotals: t,
     snapshot: {
       date,
       caloriesConsumed: t.calories,
@@ -35,7 +43,6 @@ export async function fetchNutrition(date: string): Promise<NutritionDay> {
       fiberG: t.fiber,
       sugarG: t.sugar,
       sodiumMg: t.sodium,
-      waterCups: raw.water,
     },
     meals: (raw.meals ?? []).map((m: any) => ({
       name: m.name,
@@ -49,7 +56,7 @@ export async function fetchNutrition(date: string): Promise<NutritionDay> {
 
 export async function isMFPProxyReachable(): Promise<boolean> {
   try {
-    const res = await fetch(`${MFP_PROXY}/health`, { signal: AbortSignal.timeout(3000) });
+    const res = await fetchWithTimeout(`${MFP_PROXY}/health`, 3000);
     return res.ok;
   } catch {
     return false;

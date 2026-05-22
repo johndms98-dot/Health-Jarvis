@@ -55,7 +55,7 @@ eas build --profile development --platform ios   # cloud build, ~10 min
 
 ## AI Insights (100% Free — Ollama)
 
-Uses `llama3.1:8b` via Ollama running locally on your Mac. Same model as alpaca-trader.
+Uses `llama3.2:1b` via Ollama running locally on your Mac (~4s response time, 1.3GB).
 The `/insights` POST endpoint on `garmin_proxy.py` calls `http://localhost:11434/api/generate`
 and returns the response. The app calls `GARMIN_PROXY/insights` — no API key needed.
 See `src/services/LLMService.ts` and the `generate_insights` endpoint in `proxy/garmin_proxy.py`.

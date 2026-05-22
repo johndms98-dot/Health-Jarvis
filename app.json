@@ -13,24 +13,47 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.healthdashboard.app",
+      "bundleIdentifier": "com.johndms98.healthdashboard",
       "infoPlist": {
         "NSHealthShareUsageDescription": "Reads Apple Health data to supplement Garmin and Withings metrics in your personal health dashboard.",
-        "NSHealthUpdateUsageDescription": "Health Dashboard does not write to Apple Health."
+        "NSHealthUpdateUsageDescription": "Health Dashboard does not write to Apple Health.",
+        "ITSAppUsesNonExemptEncryption": false
       }
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/icon.png",
+      "backgroundColor": "#0f172a",
+      "themeColor": "#0f172a",
+      "name": "Health Dashboard",
+      "shortName": "Health",
+      "display": "standalone",
+      "orientation": "portrait",
+      "startUrl": "/"
     },
     "plugins": [
       "expo-router",
+      "expo-asset",
+      "expo-font",
       [
         "react-native-health",
         {
-          "healthSharePermission": "Reads Apple Health data for AI-powered health insights."
+          "healthSharePermission": "Reads Apple Health data including steps, sleep, heart rate, and HRV to power your personal health dashboard.",
+          "healthUpdatePermission": "Health Dashboard does not write to Apple Health."
         }
       ]
     ],
     "scheme": "healthdashboard",
     "experiments": {
       "typedRoutes": true
+    },
+    "sdkVersion": "54.0.0",
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "297aff51-a853-4427-a14c-6831ba16beae"
+      }
     }
   }
 }
