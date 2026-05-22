@@ -18,6 +18,7 @@ function todayLabel(): string {
 function computeVitalityScore(
   today: Partial<HealthSnapshot> | undefined,
   goals: HealthGoals,
+  dynamicCalTarget?: number,
 ): { score: number; breakdown: { label: string; pct: number; weight: number }[] } {
   if (!today) return { score: 0, breakdown: [] };
 
@@ -29,10 +30,11 @@ function computeVitalityScore(
   // Body Battery component (25%) — 0-100 directly from Garmin
   const bbScore = today.bodyBattery != null ? today.bodyBattery : 50;
 
-  // Nutrition component (20%) — calories within 80-110% of goal is perfect
+  // Nutrition component (20%) — calories within 80-110% of dynamic daily target
+  const calTarget = dynamicCalTarget ?? goals.dailyCalories;
   let nutriScore = 50;
-  if (today.caloriesConsumed != null && goals.dailyCalories > 0) {
-    const ratio = today.caloriesConsumed / goals.dailyCalories;
+  if (today.caloriesConsumed != null && calTarget > 0) {
+    const ratio = today.caloriesConsumed / calTarget;
     if (ratio >= 0.8 && ratio <= 1.1) nutriScore = 100;
     else if (ratio >= 0.6 && ratio <= 1.25) nutriScore = 70;
     else if (ratio < 0.3 || ratio > 1.5) nutriScore = 20;
@@ -164,7 +166,7 @@ function MovementCard({ steps, activeCalories, goal }: {
   steps?: number; activeCalories?: number; goal: number;
 }) {
   const pct = steps != null ? Math.min((steps / goal) * 100, 100) : 0;
-  const color = pct >= 100 ? '#34d399' : pct >= 60 ? '#fbbf24' : '#f87171';
+  const color = '#60a5fa'; // blue — movement category
   return (
     <View style={[card.base, card.half]}>
       <Ionicons name="footsteps" size={16} color={color} style={{ marginBottom: 4 }} />
@@ -207,20 +209,19 @@ function SleepCard({ hours, score, goal }: { hours?: number; score?: number; goa
 }
 
 function HeartCard({ hrv, rhr }: { hrv?: number; rhr?: number }) {
-  const hrvColor = hrv == null ? '#64748b'
-    : hrv >= 50 ? '#34d399' : hrv >= 30 ? '#fbbf24' : '#f87171';
+  const color = '#f87171'; // red — heart rate category
   return (
     <View style={[card.base, card.half]}>
-      <Ionicons name="heart" size={16} color="#f87171" style={{ marginBottom: 4 }} />
+      <Ionicons name="heart" size={16} color={color} style={{ marginBottom: 4 }} />
       <Text style={card.label}>Heart Health</Text>
-      <Text style={[card.bigValue, { color: hrvColor }]}>
+      <Text style={[card.bigValue, { color }]}>
         {hrv ?? '—'}
         <Text style={card.unit}> ms</Text>
       </Text>
       <Text style={card.sublabel}>HRV</Text>
       {rhr != null && (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6 }}>
-          <Ionicons name="pulse" size={12} color="#f87171" />
+          <Ionicons name="pulse" size={12} color={color} />
           <Text style={card.footnote}>{rhr} bpm resting</Text>
         </View>
       )}
@@ -233,22 +234,22 @@ function NutritionCard({ eaten, target, proteinEaten, proteinTarget }: {
 }) {
   const calPct  = eaten != null ? Math.min((eaten / target) * 100, 100) : 0;
   const protPct = proteinEaten != null ? Math.min((proteinEaten / proteinTarget) * 100, 100) : 0;
-  const calColor = calPct >= 100 ? '#f87171' : calPct >= 70 ? '#fbbf24' : '#34d399';
+  const color = '#34d399'; // green — nutrition category
   return (
     <View style={[card.base, card.half]}>
-      <Ionicons name="flame" size={16} color="#fb923c" style={{ marginBottom: 4 }} />
+      <Ionicons name="leaf" size={16} color={color} style={{ marginBottom: 4 }} />
       <Text style={card.label}>Nutrition</Text>
-      <Text style={[card.bigValue, { color: calColor }]}>
+      <Text style={[card.bigValue, { color }]}>
         {eaten != null ? Math.round(eaten).toLocaleString() : '—'}
       </Text>
       <Text style={card.sublabel}>of {target.toLocaleString()} kcal</Text>
       <View style={[card.bar, { marginTop: 8 }]}>
-        <View style={[card.barFill, { width: `${calPct}%` as any, backgroundColor: calColor }]} />
+        <View style={[card.barFill, { width: `${calPct}%` as any, backgroundColor: color }]} />
       </View>
       {proteinEaten != null && (
         <>
           <View style={[card.bar, { marginTop: 4, backgroundColor: '#1a2540' }]}>
-            <View style={[card.barFill, { width: `${protPct}%` as any, backgroundColor: '#34d399' }]} />
+            <View style={[card.barFill, { width: `${protPct}%` as any, backgroundColor: color }]} />
           </View>
           <Text style={card.footnote}>{Math.round(proteinEaten)}g / {proteinTarget}g protein</Text>
         </>
@@ -336,19 +337,23 @@ export default function DashboardScreen() {
   );
 
   // Vitality Score
-  const { score: vitalityScore, breakdown: vitalityBreakdown } = computeVitalityScore(today, goals);
+  const { score: vitalityScore, breakdown: vitalityBreakdown } = computeVitalityScore(today, goals, targets.calories);
 
   // Goals progress — today
   const stepsHit   = (today?.steps ?? 0) >= goals.dailySteps;
   const sleepHit   = (today?.sleepHours ?? 0) > 0 && (today?.sleepHours ?? 0) >= goals.sleepHours * 0.9;
   const proteinHit = (today?.proteinG ?? 0) >= goals.proteinG * 0.9;
-  const caloriesOk = (today?.caloriesConsumed ?? 0) > 0 && (today?.caloriesConsumed ?? 0) <= goals.dailyCalories * 1.1;
+  const caloriesOk = (today?.caloriesConsumed ?? 0) > 0 && (today?.caloriesConsumed ?? 0) <= targets.calories * 1.1;
 
   // Streaks — consecutive days meeting each goal exactly (no buffer — if you set 8h, you need 8h)
   const stepsStreak   = streakFor(snapshots, s => (s.steps ?? 0) >= goals.dailySteps);
   const sleepStreak   = streakFor(snapshots, s => (s.sleepHours ?? 0) >= goals.sleepHours);
   const proteinStreak = streakFor(snapshots, s => (s.proteinG ?? 0) >= goals.proteinG);
-  const calStreak     = streakFor(snapshots, s => (s.caloriesConsumed ?? 0) > 0 && (s.caloriesConsumed ?? 0) <= goals.dailyCalories);
+  // Calorie streak uses dynamic per-day target (base + activity boost for that day)
+  const calStreak     = streakFor(snapshots, s => {
+    const dynTarget = adjustedTargets(goals, s.activeCalories, s.steps).calories;
+    return (s.caloriesConsumed ?? 0) > 0 && (s.caloriesConsumed ?? 0) <= dynTarget * 1.1;
+  });
 
   return (
     <ScrollView
@@ -426,7 +431,7 @@ export default function DashboardScreen() {
         <GoalPill icon="footsteps" label={`${goals.dailySteps.toLocaleString()} steps`} done={stepsHit}   streak={stepsStreak} />
         <GoalPill icon="moon"      label={`${goals.sleepHours}h sleep`}                 done={sleepHit}   streak={sleepStreak} />
         <GoalPill icon="fish"      label={`${goals.proteinG}g protein`}                 done={proteinHit} streak={proteinStreak} />
-        <GoalPill icon="flame"     label={`≤${goals.dailyCalories.toLocaleString()} kcal`} done={caloriesOk} streak={calStreak} />
+        <GoalPill icon="flame"     label={`≤${targets.calories.toLocaleString()} kcal`} done={caloriesOk} streak={calStreak} />
       </View>
 
       {/* Recent activities */}
