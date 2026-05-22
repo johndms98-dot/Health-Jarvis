@@ -263,7 +263,7 @@ export default function InsightsScreen() {
               <TargetRow icon="flame-outline"   label="Calories"   value={`${brief.calorieTarget} kcal`}  color="#f87171" />
               <TargetRow icon="barbell-outline" label="Protein"    value={`${brief.proteinTarget}g`}      color="#34d399" />
               <TargetRow icon="walk-outline"    label="Steps"      value={brief.stepTarget.toLocaleString()} color="#60a5fa" />
-              <TargetRow icon="moon-outline"    label="Sleep"      value={`${currentGoals.sleepHours ?? 8}h goal`} color="#a78bfa" />
+              <TargetRow icon="moon-outline"    label="Sleep"      value={`${goals.sleepHours ?? 8}h goal`} color="#a78bfa" />
               <TargetRow icon="water-outline"   label="Water"      value={`${brief.waterTarget} cups`}    color="#38bdf8" />
             </View>
             <View style={s.workoutBox}>
