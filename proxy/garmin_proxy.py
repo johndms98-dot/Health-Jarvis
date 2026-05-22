@@ -31,30 +31,34 @@ def require_client():
         raise HTTPException(status_code=503, detail="Garmin client not authenticated")
     return client
 
-# ── Gemini AI ─────────────────────────────────────────────────────────────────
+# ── Groq AI ───────────────────────────────────────────────────────────────────
+# Free tier: 14,400 req/day, 30 RPM — 10x more generous than Gemini free tier
 
-import google.generativeai as genai
+from groq import Groq
 
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
-GEMINI_MODEL = "gemini-2.0-flash"  # best free model: 1M token context, fast, multimodal
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
+GROQ_MODEL = "llama-3.3-70b-versatile"  # fast, capable, free
 
-if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)
+groq_client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
 
-async def call_gemini(prompt: str, max_tokens: int = 1024) -> str:
-    if not GEMINI_API_KEY:
-        raise HTTPException(status_code=503, detail="GEMINI_API_KEY not configured")
-    model = genai.GenerativeModel(
-        GEMINI_MODEL,
-        generation_config=genai.GenerationConfig(
-            max_output_tokens=max_tokens,
-            temperature=0.7,
-        ),
-    )
-    # Run in thread pool to avoid blocking the event loop
+async def call_ai(prompt: str, max_tokens: int = 1024, system: str = "") -> str:
+    if not groq_client:
+        raise HTTPException(status_code=503, detail="GROQ_API_KEY not configured")
+    messages = []
+    if system:
+        messages.append({"role": "system", "content": system})
+    messages.append({"role": "user", "content": prompt})
     loop = asyncio.get_event_loop()
-    response = await loop.run_in_executor(None, model.generate_content, prompt)
-    return response.text
+    response = await loop.run_in_executor(
+        None,
+        lambda: groq_client.chat.completions.create(
+            model=GROQ_MODEL,
+            messages=messages,
+            max_tokens=max_tokens,
+            temperature=0.7,
+        )
+    )
+    return response.choices[0].message.content
 
 # ── Garmin endpoints ──────────────────────────────────────────────────────────
 
@@ -128,8 +132,8 @@ async def generate_insights(req: InsightRequest):
     prompt = f"{HEALTH_COACH_PROMPT}\n\nHere is my health data for the past week:\n\n" + "\n".join(lines) + goals_ctx + "\n\nPlease give me your analysis and recommendations."
 
     try:
-        text = await call_gemini(prompt)
-        return {"text": text, "model": GEMINI_MODEL}
+        text = await call_ai(prompt)
+        return {"text": text, "model": GROQ_MODEL}
     except Exception as e:
         raise HTTPException(status_code=503, detail=f"AI error: {e}")
 
@@ -190,8 +194,8 @@ For each of the 3 meals provide:
 Prioritize protein if deficit is high. Include complex carbs if high-activity day."""
 
     try:
-        text = await call_gemini(prompt)
-        return {"text": text, "model": GEMINI_MODEL}
+        text = await call_ai(prompt)
+        return {"text": text, "model": GROQ_MODEL}
     except Exception as e:
         raise HTTPException(status_code=503, detail=f"AI error: {e}")
 
@@ -245,8 +249,8 @@ Primary goal: {goal_label}{race_note}{weight_note}
 Give them a personalized morning brief: what their body is telling them today, why today's targets are set the way they are, and one specific focus for the day."""
 
     try:
-        text = await call_gemini(prompt)
-        return {"text": text, "model": GEMINI_MODEL}
+        text = await call_ai(prompt)
+        return {"text": text, "model": GROQ_MODEL}
     except Exception as e:
         raise HTTPException(status_code=503, detail=f"AI error: {e}")
 
@@ -327,7 +331,7 @@ ACTIONS:
 - [specific action]"""
 
     try:
-        text = await call_gemini(prompt, max_tokens=2048)
+        text = await call_ai(prompt, max_tokens=2048)
         # Parse structured response
         findings, patterns, actions = [], [], []
         headline = ""
@@ -355,7 +359,7 @@ ACTIONS:
             "patterns": patterns,
             "actions": actions,
             "raw": text,
-            "model": GEMINI_MODEL,
+            "model": GROQ_MODEL,
         }
     except Exception as e:
         raise HTTPException(status_code=503, detail=f"AI error: {e}")
@@ -363,7 +367,7 @@ ACTIONS:
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "garmin_connected": client is not None, "ai": "gemini" if GEMINI_API_KEY else "not configured"}
+    return {"status": "ok", "garmin_connected": client is not None, "ai": f"groq/{GROQ_MODEL}" if GROQ_API_KEY else "not configured"}
 
 
 # ── Conversational AI chat ────────────────────────────────────────────────────
@@ -433,54 +437,46 @@ def format_chat_context(ctx: dict) -> str:
 
 @app.post("/chat")
 async def chat(req: ChatRequest):
-    if not GEMINI_API_KEY:
-        raise HTTPException(status_code=503, detail="GEMINI_API_KEY not configured")
+    if not groq_client:
+        raise HTTPException(status_code=503, detail="GROQ_API_KEY not configured")
     if not req.messages:
         raise HTTPException(status_code=400, detail="No messages provided")
 
     context_str = format_chat_context(req.context)
 
-    # Build Gemini history (all but the last user message)
-    history = []
-    for msg in req.messages[:-1]:
-        role = "model" if msg.role == "assistant" else "user"
-        history.append({"role": role, "parts": [msg.content]})
-
-    last_message = req.messages[-1].content
+    # Build OpenAI-compatible message list with system prompt + full history
+    messages = [{"role": "system", "content": f"{CHAT_SYSTEM_PROMPT}\n\n{context_str}"}]
+    for msg in req.messages:
+        messages.append({"role": msg.role, "content": msg.content})
 
     try:
-        model = genai.GenerativeModel(
-            GEMINI_MODEL,
-            system_instruction=f"{CHAT_SYSTEM_PROMPT}\n\n{context_str}",
-            generation_config=genai.GenerationConfig(
-                max_output_tokens=1024,
-                temperature=0.7,
-            ),
-        )
-
-        chat_session = model.start_chat(history=history)
-
         loop = asyncio.get_event_loop()
-        response = await loop.run_in_executor(None, chat_session.send_message, last_message)
-        text = response.text
+        response = await loop.run_in_executor(
+            None,
+            lambda: groq_client.chat.completions.create(
+                model=GROQ_MODEL,
+                messages=messages,
+                max_tokens=1024,
+                temperature=0.7,
+            )
+        )
+        text = response.choices[0].message.content
 
         # Parse optional action from response
         action = None
         action_marker = "ACTION_JSON:"
         if action_marker in text:
             try:
+                import re
                 action_str = text.split(action_marker, 1)[1].strip()
-                # Extract just the JSON object
-                import json, re
                 match = re.search(r'\{.*?\}', action_str, re.DOTALL)
                 if match:
                     action = json.loads(match.group())
-                    # Strip the action line from the displayed text
                     text = text.split(action_marker, 1)[0].strip()
             except Exception:
                 pass
 
-        return {"reply": text, "action": action, "model": GEMINI_MODEL}
+        return {"reply": text, "action": action, "model": GROQ_MODEL}
 
     except Exception as e:
         raise HTTPException(status_code=503, detail=f"AI error: {e}")
