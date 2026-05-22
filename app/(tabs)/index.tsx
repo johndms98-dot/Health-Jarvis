@@ -83,7 +83,7 @@ function VitalityScoreCard({ score, breakdown }: {
   score: number;
   breakdown: { label: string; pct: number; weight: number }[];
 }) {
-  const color = score >= 75 ? '#34d399' : score >= 50 ? '#fbbf24' : '#f87171';
+  const color = '#ffffff'; // white — always
   const label = score >= 80 ? 'Excellent' : score >= 65 ? 'Good' : score >= 45 ? 'Fair' : 'Low';
   return (
     <View style={[card.base, card.full, { marginBottom: 12 }]}>
@@ -117,8 +117,8 @@ function BodyBatteryCard({
 }: { garminValue?: number; adjustedValue?: number }) {
   const display = adjustedValue ?? garminValue;
   const color = display == null ? '#64748b'
-    : display >= 60 ? '#34d399'
-    : display >= 30 ? '#fbbf24' : '#f87171';
+    : display >= 80 ? '#34d399'
+    : display >= 41 ? '#fbbf24' : '#f87171';
   const label = display == null ? '—'
     : display >= 75 ? 'High' : display >= 50 ? 'Moderate' : display >= 25 ? 'Low' : 'Drained';
   const adjusted = adjustedValue != null && garminValue != null && adjustedValue !== garminValue;
