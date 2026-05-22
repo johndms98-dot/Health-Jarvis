@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { HealthSnapshot } from '../models/HealthSnapshot';
 
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL!;
 const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
@@ -199,16 +200,85 @@ export async function getCustomFoodByBarcode(barcode: string): Promise<CustomFoo
   return data;
 }
 
-// ─── Health Snapshots ─────────────────────────────────────────────────────────
+// ─── Health Snapshots — camelCase ↔ snake_case converters ────────────────────
 
-export async function upsertHealthSnapshot(snapshot: HealthSnapshotRow): Promise<void> {
+/** Convert app's camelCase HealthSnapshot → Supabase snake_case row */
+export function snapshotToRow(s: HealthSnapshot): HealthSnapshotRow {
+  return {
+    date: s.date,
+    garmin_steps: s.steps,
+    garmin_body_battery: s.bodyBattery,
+    garmin_resting_hr: s.restingHeartRate,
+    garmin_hrv_rmssd: s.hrv,
+    garmin_sleep_hours: s.sleepHours,
+    garmin_sleep_score: s.sleepScore,
+    garmin_deep_sleep_hours: s.deepSleepHours,
+    garmin_light_sleep_hours: s.lightSleepHours,
+    garmin_rem_sleep_hours: s.remSleepHours,
+    garmin_spo2: s.spo2,
+    garmin_avg_stress: s.avgStress,
+    garmin_active_calories: s.activeCalories,
+    // resolved values
+    steps: s.steps,
+    resting_hr: s.restingHeartRate,
+    sleep_hours: s.sleepHours,
+    deep_sleep_hours: s.deepSleepHours,
+    rem_sleep_hours: s.remSleepHours,
+    hrv_rmssd: s.hrv,
+    active_calories: s.activeCalories,
+    body_battery: s.bodyBattery,
+    sleep_score: s.sleepScore,
+    spo2: s.spo2,
+    avg_stress: s.avgStress,
+    weight_kg: s.weightKg,
+    body_fat_pct: s.bodyFatPct,
+    muscle_mass_kg: s.muscleMassKg,
+    calories_consumed: s.caloriesConsumed,
+    protein_g: s.proteinG,
+    carbs_g: s.carbsG,
+    fat_g: s.fatG,
+    fiber_g: s.fiberG,
+    water_cups: s.waterCups,
+  };
+}
+
+/** Convert Supabase row → app's camelCase HealthSnapshot */
+export function rowToSnapshot(r: HealthSnapshotRow): HealthSnapshot {
+  return {
+    date: r.date,
+    steps: r.steps ?? r.garmin_steps,
+    bodyBattery: r.body_battery ?? r.garmin_body_battery,
+    restingHeartRate: r.resting_hr ?? r.garmin_resting_hr,
+    hrv: r.hrv_rmssd ?? r.garmin_hrv_rmssd,
+    sleepHours: r.sleep_hours ?? r.garmin_sleep_hours,
+    sleepScore: r.sleep_score ?? r.garmin_sleep_score,
+    deepSleepHours: r.deep_sleep_hours ?? r.garmin_deep_sleep_hours,
+    lightSleepHours: r.garmin_light_sleep_hours,
+    remSleepHours: r.rem_sleep_hours ?? r.garmin_rem_sleep_hours,
+    spo2: r.spo2 ?? r.garmin_spo2,
+    avgStress: r.avg_stress ?? r.garmin_avg_stress,
+    activeCalories: r.active_calories ?? r.garmin_active_calories,
+    weightKg: r.weight_kg,
+    bodyFatPct: r.body_fat_pct,
+    muscleMassKg: r.muscle_mass_kg,
+    caloriesConsumed: r.calories_consumed,
+    proteinG: r.protein_g,
+    carbsG: r.carbs_g,
+    fatG: r.fat_g,
+    fiberG: r.fiber_g,
+    waterCups: r.water_cups,
+  };
+}
+
+export async function upsertHealthSnapshot(snapshot: HealthSnapshot): Promise<void> {
+  const row = snapshotToRow(snapshot);
   const { error } = await supabase
     .from('health_snapshots')
-    .upsert(snapshot, { onConflict: 'date' });
+    .upsert(row, { onConflict: 'date' });
   if (error) console.error('upsertHealthSnapshot error:', error);
 }
 
-export async function getHealthSnapshots(days: number = 30): Promise<HealthSnapshotRow[]> {
+export async function getHealthSnapshots(days: number = 30): Promise<HealthSnapshot[]> {
   const startDate = new Date();
   startDate.setDate(startDate.getDate() - days);
   const { data, error } = await supabase
@@ -217,7 +287,7 @@ export async function getHealthSnapshots(days: number = 30): Promise<HealthSnaps
     .gte('date', startDate.toISOString().split('T')[0])
     .order('date', { ascending: false });
   if (error) { console.error('getHealthSnapshots error:', error); return []; }
-  return data ?? [];
+  return (data ?? []).map(rowToSnapshot);
 }
 
 export async function getHealthSnapshot(date: string): Promise<HealthSnapshotRow | null> {

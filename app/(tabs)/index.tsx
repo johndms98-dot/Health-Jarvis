@@ -12,6 +12,102 @@ function todayLabel(): string {
   return new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 }
 
+// ── Vitality Score — 0-100 composite ──────────────────────────────────────────
+// Sleep 30% + Body Battery 25% + Nutrition 20% + Steps 15% + HRV 10%
+
+function computeVitalityScore(
+  today: Partial<HealthSnapshot> | undefined,
+  goals: HealthGoals,
+): { score: number; breakdown: { label: string; pct: number; weight: number }[] } {
+  if (!today) return { score: 0, breakdown: [] };
+
+  // Sleep component (30%) — hours vs goal
+  const sleepScore = today.sleepHours != null && goals.sleepHours > 0
+    ? Math.min((today.sleepHours / goals.sleepHours) * 100, 100)
+    : 50;  // neutral if no data
+
+  // Body Battery component (25%) — 0-100 directly from Garmin
+  const bbScore = today.bodyBattery != null ? today.bodyBattery : 50;
+
+  // Nutrition component (20%) — calories within 80-110% of goal is perfect
+  let nutriScore = 50;
+  if (today.caloriesConsumed != null && goals.dailyCalories > 0) {
+    const ratio = today.caloriesConsumed / goals.dailyCalories;
+    if (ratio >= 0.8 && ratio <= 1.1) nutriScore = 100;
+    else if (ratio >= 0.6 && ratio <= 1.25) nutriScore = 70;
+    else if (ratio < 0.3 || ratio > 1.5) nutriScore = 20;
+    else nutriScore = 45;
+    // Bonus for protein
+    if (today.proteinG != null && goals.proteinG > 0 && today.proteinG >= goals.proteinG * 0.9) {
+      nutriScore = Math.min(nutriScore + 10, 100);
+    }
+  }
+
+  // Steps component (15%)
+  const stepsScore = today.steps != null && goals.dailySteps > 0
+    ? Math.min((today.steps / goals.dailySteps) * 100, 100) : 50;
+
+  // HRV component (10%) — above 50ms RMSSD = healthy baseline
+  let hrvScore = 50;
+  if (today.hrv != null) {
+    if (today.hrv >= 70) hrvScore = 100;
+    else if (today.hrv >= 50) hrvScore = 80;
+    else if (today.hrv >= 35) hrvScore = 60;
+    else if (today.hrv >= 20) hrvScore = 35;
+    else hrvScore = 15;
+  }
+
+  const score = Math.round(
+    sleepScore * 0.30 +
+    bbScore    * 0.25 +
+    nutriScore * 0.20 +
+    stepsScore * 0.15 +
+    hrvScore   * 0.10,
+  );
+
+  return {
+    score,
+    breakdown: [
+      { label: 'Sleep',    pct: Math.round(sleepScore),  weight: 30 },
+      { label: 'Battery',  pct: Math.round(bbScore),     weight: 25 },
+      { label: 'Nutrition',pct: Math.round(nutriScore),  weight: 20 },
+      { label: 'Steps',    pct: Math.round(stepsScore),  weight: 15 },
+      { label: 'HRV',      pct: Math.round(hrvScore),    weight: 10 },
+    ],
+  };
+}
+
+function VitalityScoreCard({ score, breakdown }: {
+  score: number;
+  breakdown: { label: string; pct: number; weight: number }[];
+}) {
+  const color = score >= 75 ? '#34d399' : score >= 50 ? '#fbbf24' : '#f87171';
+  const label = score >= 80 ? 'Excellent' : score >= 65 ? 'Good' : score >= 45 ? 'Fair' : 'Low';
+  return (
+    <View style={[card.base, card.full, { marginBottom: 12 }]}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        <View>
+          <Text style={card.label}>Vitality Score</Text>
+          <Text style={[card.bigValue, { color, fontSize: 56 }]}>{score}</Text>
+          <View style={[{ backgroundColor: color + '20', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 4, alignSelf: 'flex-start' }]}>
+            <Text style={{ color, fontWeight: '700', fontSize: 12 }}>{label}</Text>
+          </View>
+        </View>
+        <View style={{ gap: 6, minWidth: 120 }}>
+          {breakdown.map(b => (
+            <View key={b.label} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Text style={{ fontSize: 11, color: '#64748b', width: 52 }}>{b.label}</Text>
+              <View style={{ flex: 1, height: 4, backgroundColor: '#334155', borderRadius: 2 }}>
+                <View style={{ height: 4, borderRadius: 2, width: `${b.pct}%` as any, backgroundColor: b.pct >= 70 ? '#34d399' : b.pct >= 45 ? '#fbbf24' : '#f87171' }} />
+              </View>
+            </View>
+          ))}
+        </View>
+      </View>
+    </View>
+  );
+}
+
 // ── Body Battery card (full width) ───────────────────────────────────────────
 
 function BodyBatteryCard({
@@ -239,6 +335,9 @@ export default function DashboardScreen() {
     goals.waterCups,
   );
 
+  // Vitality Score
+  const { score: vitalityScore, breakdown: vitalityBreakdown } = computeVitalityScore(today, goals);
+
   // Goals progress — today
   const stepsHit   = (today?.steps ?? 0) >= goals.dailySteps;
   const sleepHit   = (today?.sleepHours ?? 0) > 0 && (today?.sleepHours ?? 0) >= goals.sleepHours * 0.9;
@@ -276,12 +375,15 @@ export default function DashboardScreen() {
       {!proxyReachable && (
         <View style={styles.banner}>
           <Ionicons name="warning" size={14} color="#fbbf24" />
-          <Text style={styles.bannerText}>  Mac proxy offline — showing cached data</Text>
+          <Text style={styles.bannerText}>  Garmin proxy offline — showing cached data</Text>
         </View>
       )}
       {lastSyncedAt && (
         <Text style={styles.syncText}>Synced {new Date(lastSyncedAt).toLocaleTimeString()}</Text>
       )}
+
+      {/* Vitality Score — composite health score */}
+      <VitalityScoreCard score={vitalityScore} breakdown={vitalityBreakdown} />
 
       {/* Top 5 metric cards */}
       <BodyBatteryCard garminValue={today?.bodyBattery} adjustedValue={adjustedBB} />

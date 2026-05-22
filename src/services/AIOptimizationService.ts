@@ -9,7 +9,7 @@
 
 import { GARMIN_PROXY } from '../../constants/Config';
 import { HealthSnapshot } from '../models/HealthSnapshot';
-import { Goals } from '../models/Goals';
+import { HealthGoals as Goals } from '../models/Goals';
 
 export type PrimaryGoal = 'weight_loss' | 'race_pace' | 'muscle_gain' | 'general_health';
 

@@ -17,6 +17,7 @@
       "infoPlist": {
         "NSHealthShareUsageDescription": "Reads Apple Health data to supplement Garmin and Withings metrics in your personal health dashboard.",
         "NSHealthUpdateUsageDescription": "Health Dashboard does not write to Apple Health.",
+        "NSCameraUsageDescription": "Camera is used to scan barcodes for food logging.",
         "ITSAppUsesNonExemptEncryption": false
       }
     },
@@ -41,6 +42,12 @@
         {
           "healthSharePermission": "Reads Apple Health data including steps, sleep, heart rate, and HRV to power your personal health dashboard.",
           "healthUpdatePermission": "Health Dashboard does not write to Apple Health."
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Health Dashboard to use your camera to scan food barcodes."
         }
       ]
     ],

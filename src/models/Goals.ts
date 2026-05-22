@@ -3,6 +3,7 @@ export interface HealthGoals {
   currentWeightLbs?: number;
   targetWeightLbs?: number;
   targetBodyFatPct?: number;
+  weeklyWeightLossLbs?: number;  // e.g. 1.0 = 1 lb/week deficit
 
   // Daily nutrition — base targets (auto-adjusted for activity at render time)
   dailyCalories: number;
@@ -20,6 +21,12 @@ export interface HealthGoals {
   sleepHours: number;
   bedtime: string;   // "23:00"
   wakeTime: string;  // "07:00"
+
+  // Goal type — drives AI optimization decisions
+  primaryGoal?: 'weight_loss' | 'race_pace' | 'muscle_gain' | 'general_health';
+  raceDistanceKm?: number;      // e.g. 42.2 for marathon
+  targetRacePaceMinPerKm?: number;  // e.g. 5.5 = 5:30/km
+  targetRaceDate?: string;          // YYYY-MM-DD
 }
 
 export const DEFAULT_GOALS: HealthGoals = {
