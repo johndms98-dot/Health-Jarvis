@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   Modal, TextInput, FlatList, ActivityIndicator, Alert, Platform,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
@@ -63,9 +64,10 @@ function FoodSearchModal({
   const [servings, setServings] = useState('1');
   const [adding, setAdding] = useState(false);
   const [scanned, setScanned] = useState(false);
+  const [scanLoading, setScanLoading] = useState(false);
 
   const reset = () => {
-    setQuery(''); setResults([]); setSelected(null); setServings('1'); setScanned(false);
+    setQuery(''); setResults([]); setSelected(null); setServings('1'); setScanned(false); setScanLoading(false);
   };
 
   const handleClose = () => { reset(); setMode('search'); onClose(); };
@@ -83,12 +85,19 @@ function FoodSearchModal({
   const handleBarcode = async ({ data: barcode }: { data: string }) => {
     if (scanned) return;
     setScanned(true);
-    setMode('search');
+    setScanLoading(true);
     try {
       const result = await lookupBarcode(barcode);
+      // Switch mode AFTER lookup completes — avoids tearing down CameraView mid-flight
+      setMode('search');
+      setScanLoading(false);
       if (result) { setSelected(result); setResults([]); }
       else { Alert.alert('Not found', `Barcode ${barcode} wasn't found in our database.`); setScanned(false); }
-    } catch { setScanned(false); }
+    } catch {
+      setMode('search');
+      setScanLoading(false);
+      setScanned(false);
+    }
   };
 
   const addFood = async () => {
@@ -114,57 +123,59 @@ function FoodSearchModal({
   if (selected) {
     return (
       <Modal visible animationType="slide" presentationStyle="pageSheet">
-        <View style={s.modal}>
-          <View style={s.modalHeader}>
-            <TouchableOpacity onPress={() => setSelected(null)}>
-              <Ionicons name="arrow-back" size={22} color="#94a3b8" />
-            </TouchableOpacity>
-            <Text style={s.modalTitle} numberOfLines={1}>{selected.name}</Text>
-            <View style={{ width: 22 }} />
-          </View>
-          {selected.brand ? <Text style={s.brandText}>{selected.brand}</Text> : null}
-
-          <ScrollView style={{ flex: 1, padding: 20 }}>
-            <Text style={s.sectionLabel}>Per {selected.serving_qty} {selected.serving_unit}{selected.serving_weight_g ? ` (${selected.serving_weight_g}g)` : ''}</Text>
-            <View style={s.nutriRow}><Text style={s.nutriLabel}>Calories</Text><Text style={s.nutriVal}>{selected.calories ?? 0}</Text></View>
-            <View style={s.nutriRow}><Text style={s.nutriLabel}>Protein</Text><Text style={s.nutriVal}>{selected.protein_g ?? 0}g</Text></View>
-            <View style={s.nutriRow}><Text style={s.nutriLabel}>Carbs</Text><Text style={s.nutriVal}>{selected.carbs_g ?? 0}g</Text></View>
-            <View style={s.nutriRow}><Text style={s.nutriLabel}>Fat</Text><Text style={s.nutriVal}>{selected.fat_g ?? 0}g</Text></View>
-            {selected.fiber_g != null && <View style={s.nutriRow}><Text style={s.nutriLabel}>Fiber</Text><Text style={s.nutriVal}>{selected.fiber_g}g</Text></View>}
-            {selected.sugar_g != null && <View style={s.nutriRow}><Text style={s.nutriLabel}>Sugar</Text><Text style={s.nutriVal}>{selected.sugar_g}g</Text></View>}
-            {selected.sodium_mg != null && <View style={s.nutriRow}><Text style={s.nutriLabel}>Sodium</Text><Text style={s.nutriVal}>{selected.sodium_mg}mg</Text></View>}
-            {selected.saturated_fat_g != null && <View style={s.nutriRow}><Text style={s.nutriLabel}>Sat Fat</Text><Text style={s.nutriVal}>{selected.saturated_fat_g}g</Text></View>}
-
-            <Text style={[s.sectionLabel, { marginTop: 24 }]}>Number of servings</Text>
-            <TextInput
-              style={s.servingInput}
-              value={servings}
-              onChangeText={setServings}
-              keyboardType="decimal-pad"
-              placeholder="1"
-              placeholderTextColor="#475569"
-            />
-
-            <View style={s.totalBox}>
-              <Text style={s.totalLabel}>Total ({parseFloat(servings) || 1}x serving)</Text>
-              <Text style={s.totalCal}>{Math.round(selected.calories * (parseFloat(servings) || 1))} kcal</Text>
-              <Text style={s.totalMacros}>
-                P: {Math.round(selected.protein_g * (parseFloat(servings) || 1))}g ·{' '}
-                C: {Math.round(selected.carbs_g * (parseFloat(servings) || 1))}g ·{' '}
-                F: {Math.round(selected.fat_g * (parseFloat(servings) || 1))}g
-              </Text>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding" keyboardVerticalOffset={0}>
+          <View style={s.modal}>
+            <View style={s.modalHeader}>
+              <TouchableOpacity onPress={() => setSelected(null)}>
+                <Ionicons name="arrow-back" size={22} color="#94a3b8" />
+              </TouchableOpacity>
+              <Text style={s.modalTitle} numberOfLines={1}>{selected.name}</Text>
+              <View style={{ width: 22 }} />
             </View>
-          </ScrollView>
+            {selected.brand ? <Text style={s.brandText}>{selected.brand}</Text> : null}
 
-          <View style={s.modalFooter}>
-            <TouchableOpacity style={s.cancelBtn} onPress={() => setSelected(null)}>
-              <Text style={s.cancelBtnText}>Back</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={s.addBtn} onPress={addFood} disabled={adding}>
-              {adding ? <ActivityIndicator color="#fff" size="small" /> : <Text style={s.addBtnText}>Add to {mealType}</Text>}
-            </TouchableOpacity>
+            <ScrollView style={{ flex: 1, padding: 20 }} keyboardShouldPersistTaps="handled">
+              <Text style={s.sectionLabel}>Per {selected.serving_qty} {selected.serving_unit}{selected.serving_weight_g ? ` (${selected.serving_weight_g}g)` : ''}</Text>
+              <View style={s.nutriRow}><Text style={s.nutriLabel}>Calories</Text><Text style={s.nutriVal}>{Math.round(selected.calories ?? 0)}</Text></View>
+              <View style={s.nutriRow}><Text style={s.nutriLabel}>Protein</Text><Text style={s.nutriVal}>{(+(selected.protein_g ?? 0)).toFixed(1)}g</Text></View>
+              <View style={s.nutriRow}><Text style={s.nutriLabel}>Carbs</Text><Text style={s.nutriVal}>{(+(selected.carbs_g ?? 0)).toFixed(1)}g</Text></View>
+              <View style={s.nutriRow}><Text style={s.nutriLabel}>Fat</Text><Text style={s.nutriVal}>{(+(selected.fat_g ?? 0)).toFixed(1)}g</Text></View>
+              {selected.fiber_g != null && <View style={s.nutriRow}><Text style={s.nutriLabel}>Fiber</Text><Text style={s.nutriVal}>{(+selected.fiber_g).toFixed(1)}g</Text></View>}
+              {selected.sugar_g != null && <View style={s.nutriRow}><Text style={s.nutriLabel}>Sugar</Text><Text style={s.nutriVal}>{(+selected.sugar_g).toFixed(1)}g</Text></View>}
+              {selected.sodium_mg != null && <View style={s.nutriRow}><Text style={s.nutriLabel}>Sodium</Text><Text style={s.nutriVal}>{Math.round(selected.sodium_mg)}mg</Text></View>}
+              {selected.saturated_fat_g != null && <View style={s.nutriRow}><Text style={s.nutriLabel}>Sat Fat</Text><Text style={s.nutriVal}>{(+selected.saturated_fat_g).toFixed(1)}g</Text></View>}
+
+              <Text style={[s.sectionLabel, { marginTop: 24 }]}>Number of servings</Text>
+              <TextInput
+                style={s.servingInput}
+                value={servings}
+                onChangeText={setServings}
+                keyboardType="decimal-pad"
+                placeholder="1"
+                placeholderTextColor="#475569"
+              />
+
+              <View style={s.totalBox}>
+                <Text style={s.totalLabel}>Total ({parseFloat(servings) || 1}x serving)</Text>
+                <Text style={s.totalCal}>{Math.round(selected.calories * (parseFloat(servings) || 1))} kcal</Text>
+                <Text style={s.totalMacros}>
+                  P: {Math.round(selected.protein_g * (parseFloat(servings) || 1))}g ·{' '}
+                  C: {Math.round(selected.carbs_g * (parseFloat(servings) || 1))}g ·{' '}
+                  F: {Math.round(selected.fat_g * (parseFloat(servings) || 1))}g
+                </Text>
+              </View>
+            </ScrollView>
+
+            <View style={s.modalFooter}>
+              <TouchableOpacity style={s.cancelBtn} onPress={() => setSelected(null)}>
+                <Text style={s.cancelBtnText}>Back</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={s.addBtn} onPress={addFood} disabled={adding}>
+                {adding ? <ActivityIndicator color="#fff" size="small" /> : <Text style={s.addBtnText}>Add to {mealType}</Text>}
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     );
   }
@@ -200,11 +211,19 @@ function FoodSearchModal({
             onBarcodeScanned={scanned ? undefined : handleBarcode}
           />
           <View style={s.scanOverlay}>
-            <View style={s.scanFrame} />
-            <Text style={s.scanHint}>Point at a food barcode to scan</Text>
-            <TouchableOpacity style={s.scanCancel} onPress={() => { setMode('search'); setScanned(false); }}>
-              <Text style={s.scanCancelText}>Cancel</Text>
-            </TouchableOpacity>
+            <View style={[s.scanFrame, scanLoading && { borderColor: '#fbbf24' }]} />
+            {scanLoading
+              ? <View style={s.scanHintRow}>
+                  <ActivityIndicator size="small" color="#fbbf24" />
+                  <Text style={[s.scanHint, { color: '#fbbf24', marginTop: 0, marginLeft: 8 }]}>Looking up barcode…</Text>
+                </View>
+              : <Text style={s.scanHint}>Point at a food barcode to scan</Text>
+            }
+            {!scanLoading && (
+              <TouchableOpacity style={s.scanCancel} onPress={() => { setMode('search'); setScanned(false); }}>
+                <Text style={s.scanCancelText}>Cancel</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       </Modal>
@@ -214,55 +233,59 @@ function FoodSearchModal({
   // Search mode (default)
   return (
     <Modal visible animationType="slide" presentationStyle="pageSheet">
-      <View style={s.modal}>
-        <View style={s.modalHeader}>
-          <TouchableOpacity onPress={handleClose}>
-            <Ionicons name="close" size={22} color="#94a3b8" />
-          </TouchableOpacity>
-          <Text style={s.modalTitle}>Add to {mealType}</Text>
-          <TouchableOpacity onPress={() => { setMode('scan'); setScanned(false); }}>
-            <Ionicons name="barcode-outline" size={24} color="#34d399" />
-          </TouchableOpacity>
-        </View>
-
-        <View style={s.searchRow}>
-          <Ionicons name="search-outline" size={18} color="#64748b" style={{ marginRight: 8 }} />
-          <TextInput
-            style={s.searchInput}
-            placeholder="Search food (e.g. Greek yogurt, chicken breast…)"
-            placeholderTextColor="#475569"
-            value={query}
-            onChangeText={(t) => { setQuery(t); doSearch(t); }}
-            autoFocus
-            returnKeyType="search"
-            onSubmitEditing={() => doSearch(query)}
-          />
-          {searching && <ActivityIndicator size="small" color="#34d399" />}
-        </View>
-
-        <FlatList
-          data={results}
-          keyExtractor={(_, i) => i.toString()}
-          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 40 }}
-          ListEmptyComponent={
-            query.length > 1 && !searching ? (
-              <Text style={{ color: '#475569', textAlign: 'center', marginTop: 40 }}>No results found</Text>
-            ) : null
-          }
-          renderItem={({ item }) => (
-            <TouchableOpacity style={s.resultRow} onPress={() => setSelected(item)}>
-              <View style={{ flex: 1 }}>
-                <Text style={s.resultName} numberOfLines={1}>{item.name}</Text>
-                {item.brand ? <Text style={s.resultBrand}>{item.brand}</Text> : null}
-              </View>
-              <View style={{ alignItems: 'flex-end' }}>
-                <Text style={s.resultCal}>{item.calories ?? '?'} kcal</Text>
-                <Text style={s.resultServing}>per {item.serving_qty} {item.serving_unit}</Text>
-              </View>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding" keyboardVerticalOffset={0}>
+        <View style={s.modal}>
+          <View style={s.modalHeader}>
+            <TouchableOpacity onPress={handleClose}>
+              <Ionicons name="close" size={22} color="#94a3b8" />
             </TouchableOpacity>
-          )}
-        />
-      </View>
+            <Text style={s.modalTitle}>Add to {mealType}</Text>
+            <TouchableOpacity onPress={() => { setMode('scan'); setScanned(false); }}>
+              <Ionicons name="barcode-outline" size={24} color="#34d399" />
+            </TouchableOpacity>
+          </View>
+
+          <View style={s.searchRow}>
+            <Ionicons name="search-outline" size={18} color="#64748b" style={{ marginRight: 8 }} />
+            <TextInput
+              style={s.searchInput}
+              placeholder="Search food (e.g. Greek yogurt, chicken breast…)"
+              placeholderTextColor="#475569"
+              value={query}
+              onChangeText={(t) => { setQuery(t); doSearch(t); }}
+              autoFocus
+              returnKeyType="search"
+              onSubmitEditing={() => doSearch(query)}
+            />
+            {searching && <ActivityIndicator size="small" color="#34d399" />}
+          </View>
+
+          <FlatList
+            data={results}
+            keyExtractor={(_, i) => i.toString()}
+            contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 40 }}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
+            ListEmptyComponent={
+              query.length > 1 && !searching ? (
+                <Text style={{ color: '#475569', textAlign: 'center', marginTop: 40 }}>No results found</Text>
+              ) : null
+            }
+            renderItem={({ item }) => (
+              <TouchableOpacity style={s.resultRow} onPress={() => setSelected(item)}>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.resultName} numberOfLines={1}>{item.name}</Text>
+                  {item.brand ? <Text style={s.resultBrand}>{item.brand}</Text> : null}
+                </View>
+                <View style={{ alignItems: 'flex-end' }}>
+                  <Text style={s.resultCal}>{item.calories ?? '?'} kcal</Text>
+                  <Text style={s.resultServing}>per {item.serving_qty} {item.serving_unit}</Text>
+                </View>
+              </TouchableOpacity>
+            )}
+          />
+        </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -455,6 +478,7 @@ const s = StyleSheet.create({
   scanOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'center', alignItems: 'center' },
   scanFrame: { width: 260, height: 160, borderWidth: 2, borderColor: '#34d399', borderRadius: 12 },
   scanHint: { color: '#fff', fontSize: 14, marginTop: 20, backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 },
+  scanHintRow: { flexDirection: 'row', alignItems: 'center', marginTop: 20, backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 },
   scanCancel: { position: 'absolute', bottom: 60, backgroundColor: 'rgba(0,0,0,0.7)', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 24 },
   scanCancelText: { color: '#fff', fontSize: 16, fontWeight: '600' },
 });
