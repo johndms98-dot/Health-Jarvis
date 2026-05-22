@@ -193,8 +193,8 @@ export default function MealsScreen() {
             </View>
             <Text style={styles.resultsText}>{result}</Text>
             <View style={styles.modelBadge}>
-              <Ionicons name="hardware-chip-outline" size={11} color="#475569" />
-              <Text style={styles.modelBadgeText}> llama3.2 · runs locally on your Mac</Text>
+              <Ionicons name="cloud-outline" size={11} color="#475569" />
+              <Text style={styles.modelBadgeText}> Groq · Llama 3.3 70B · cloud</Text>
             </View>
           </View>
         )}

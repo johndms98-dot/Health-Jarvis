@@ -20,7 +20,7 @@ export async function generateInsights(
 ): Promise<AIInsight> {
   const res = await fetchWithTimeout(
     `${GARMIN_PROXY}/insights`,
-    JSON.stringify({ snapshots: snapshots.slice(0, 7), goals: goals ?? {}, model: 'gemini-2.0-flash' }),
+    JSON.stringify({ snapshots: snapshots.slice(0, 7), goals: goals ?? {}, model: 'llama-3.3-70b-versatile' }),
   );
 
   if (!res.ok) {
@@ -48,7 +48,7 @@ export async function generateMealIdeas(
       ingredients,
       today_snapshot: todaySnapshot,
       goals,
-      model: 'gemini-2.0-flash',
+      model: 'llama-3.3-70b-versatile',
     }),
   );
 
