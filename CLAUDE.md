@@ -1,68 +1,98 @@
-# Health Dashboard
+# Health Jarvis — Personal AI Health Dashboard
 
-Personal iPhone app consolidating direct Garmin + Withings + MyFitnessPal data with Claude AI insights.
-Built with Expo React Native. No Xcode required — cloud builds via EAS Build.
+Native iOS app (EAS Build) consolidating Garmin + Apple Health + Withings + own food logs,
+powered by Gemini 2.0 Flash AI. Runs 100% in the cloud — no Mac/home WiFi dependency.
 
 ## Data Sources
 
 | Source | Method | Key metrics |
 |---|---|---|
-| Garmin | Mac proxy (`proxy/garmin_proxy.py`, port 8765) | Steps, body battery, sleep stages, HRV, SpO2, stress, RHR, respiration |
-| MyFitnessPal | Mac proxy (`proxy/mfp_proxy.py`, port 8766) | Calories, macros, per-meal breakdown, water |
-| Withings | Direct Withings Health API (OAuth in app) | Weight, body fat %, muscle mass, bone mass, hydration, BP |
-| Apple Health | react-native-health in app | Mindfulness, exercise time (supplemental) |
+| Garmin | Python proxy on Render.com (free) | Steps, body battery, sleep stages, HRV, SpO2, stress, RHR, respiration |
+| Apple Health | react-native-health (native) | Steps, sleep, HR, HRV, mindfulness, workouts — cross-checked vs Garmin |
+| Withings | Direct Withings Health API (OAuth in app) | Weight, body fat %, muscle mass |
+| Food | Own barcode scanner → Open Food Facts + USDA + Supabase | All macros + micros |
+| AI | Gemini 2.0 Flash via Render proxy | Morning brief, insights, deep analysis |
 
 ## Key Files
 
-- `src/services/GarminService.ts` — fetches from Mac proxy, parses Garmin Connect JSON
-- `src/services/MFPService.ts` — fetches from Mac proxy, parses MFP data
+- `src/services/GarminService.ts` — fetches from Render cloud proxy, parses Garmin JSON
+- `src/services/FoodDatabaseService.ts` — barcode lookup (Open Food Facts → USDA → custom DB)
+- `src/services/SupabaseService.ts` — food logs, health snapshot cache, goals, insights history
+- `src/services/DataResolutionService.ts` — per-metric Garmin vs Apple Health resolution logic
+- `src/services/AIOptimizationService.ts` — recovery score, daily brief, deep trend analysis
+- `src/services/LLMService.ts` — 7-day insights via Gemini (calls /insights on Render proxy)
 - `src/services/WithingsService.ts` — OAuth flow + Withings REST API
-- `src/services/ClaudeService.ts` — Anthropic API, claude-sonnet-4-6, prompt caching
 - `src/services/HealthKitService.ts` — Apple Health supplemental data
-- `src/hooks/useHealthData.ts` — orchestrates all sources into HealthSnapshot[]
+- `src/hooks/useHealthData.ts` — orchestrates all sources → HealthSnapshot[], caches to Supabase
 - `src/store/healthStore.ts` — Zustand global state
-- `app/(tabs)/index.tsx` — Dashboard screen
-- `app/(tabs)/nutrition.tsx` — Nutrition screen
-- `app/(tabs)/insights.tsx` — Claude AI insights screen
+- `app/(tabs)/index.tsx` — Dashboard (Vitality Score + metrics + activities)
+- `app/(tabs)/nutrition.tsx` — Food logger with barcode scanner
+- `app/(tabs)/insights.tsx` — AI insights (morning brief + weekly + deep analysis)
 
-## Running Locally
+## Cloud Infrastructure (all free)
 
-```bash
-# 1. Start Mac proxies (run this on your Mac first)
-bash proxy/start.sh
+| Service | Purpose | URL |
+|---|---|---|
+| Render.com (free) | Garmin proxy + Gemini AI | https://health-jarvis.onrender.com |
+| Supabase (free) | PostgreSQL DB | optaeyajouxqkirmtngl.supabase.co |
+| UptimeRobot (free) | Keep Render awake | Ping /health every 5 min |
+| GitHub | Source control | johndms98-dot/Health-Jarvis |
 
-# 2. Start Expo dev server
-npm start
+**Render free tier note**: Sleeps after 15 min idle, ~50s cold start. UptimeRobot keeps it warm.
 
-# 3. Scan QR code with Expo Go app on iPhone
-# NOTE: HealthKit features require an EAS development build, not Expo Go
-```
-
-## EAS Build (for HealthKit / full app)
+## Running Locally (dev build)
 
 ```bash
-npm install -g eas-cli
-eas login                                    # create free account at expo.dev
-eas build --profile development --platform ios   # cloud build, ~10 min
-# Download IPA link from email → AirDrop to iPhone → Settings > Trust developer
+# Requires the EAS dev build installed on iPhone (one-time via EAS Build)
+npx expo start --dev-client
+# Scan QR code with dev build app (NOT Expo Go)
 ```
+
+## EAS Build (rebuild after native changes)
+
+```bash
+eas build --profile development --platform ios
+# Download IPA → AirDrop → iPhone → Settings > Trust
+```
+
+## Proxy Endpoints (Render)
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `/health` | GET | Keep-alive ping |
+| `/garmin/snapshot/{date}` | GET | Steps, HRV, sleep, body battery, stress, SpO2 |
+| `/garmin/activities` | GET | Recent activities |
+| `/insights` | POST | 7-day AI analysis (Gemini 2.0 Flash) |
+| `/optimize` | POST | Daily morning brief — recovery + targets |
+| `/deep-insights` | POST | 30-90 day deep trend analysis |
+| `/meals` | POST | AI meal suggestions from ingredients |
+
+## Vitality Score (home screen widget)
+
+0-100 composite score:
+- Sleep: 30% (hours vs goal)
+- Body Battery: 25% (Garmin 0-100)
+- Nutrition: 20% (calories + protein vs targets)
+- Steps: 15% (% of daily goal)
+- HRV: 10% (absolute RMSSD ms threshold)
+
+## UptimeRobot Setup
+
+1. Go to uptimerobot.com → Create free account
+2. New Monitor → HTTP(S)
+3. URL: `https://health-jarvis.onrender.com/health`
+4. Interval: 5 minutes
+5. Done — Render service stays warm 24/7
 
 ## Secrets
 
-- `.env.local` — GITIGNORED. Copy from `.env.example` and fill in values.
-- `proxy/.env` — GITIGNORED. Copy from `proxy/.env.example` and fill in Garmin/MFP credentials.
-- Find your Mac's local IP: System Settings > Wi-Fi > Details > IP Address
+- `.env.local` — GITIGNORED. Contains EXPO_PUBLIC_GARMIN_PROXY, SUPABASE keys, GEMINI_API_KEY
+- `proxy/.env` — GITIGNORED. Contains GARMIN_EMAIL, GARMIN_PASSWORD, GEMINI_API_KEY (on Render, set as env vars in dashboard)
 
-## AI Insights (100% Free — Ollama)
+## Goals Screen (app)
 
-Uses `llama3.2:1b` via Ollama running locally on your Mac (~4s response time, 1.3GB).
-The `/insights` POST endpoint on `garmin_proxy.py` calls `http://localhost:11434/api/generate`
-and returns the response. The app calls `GARMIN_PROXY/insights` — no API key needed.
-See `src/services/LLMService.ts` and the `generate_insights` endpoint in `proxy/garmin_proxy.py`.
-
-## Withings Setup
-
-1. Register a free developer app at developer.withings.com
-2. Set redirect URI to `healthdashboard://withings-auth`
-3. Add client ID and secret to `.env.local`
-4. Tap "Connect Withings" in the app to complete OAuth
+Set in-app → saved to Supabase `goals` table. Includes:
+- Primary goal: weight_loss / race_pace / muscle_gain / general_health
+- Race details (distance, target pace, date) for race training optimization
+- Daily nutrition targets, step goal, sleep goal
+- Current and target weight
