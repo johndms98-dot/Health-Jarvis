@@ -1,7 +1,16 @@
 # Health Jarvis — Personal AI Health Dashboard
 
 Native iOS app (EAS Build) consolidating Garmin + Apple Health + Withings + own food logs,
-powered by Gemini 2.0 Flash AI. Runs 100% in the cloud — no Mac/home WiFi dependency.
+powered by Groq AI. Runs 100% in the cloud — no Mac/home WiFi dependency.
+
+## ⚠️ HARD RULE — Cloud-Only Architecture
+
+**Never suggest or set up anything that requires the user's Mac to be running.**
+This app must work as a fully standalone iPhone app at all times.
+
+- ✅ Allowed: Render.com, Supabase, Groq, EAS Build, any cloud-hosted service
+- ❌ Never: Ollama, local Python servers, local proxies, `uvicorn` on Mac, anything on `localhost`, any process that requires the Mac to be on
+- If a feature needs a backend, use Render.com (free tier) — same pattern as the Garmin proxy
 
 ## Data Sources
 
