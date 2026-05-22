@@ -9,7 +9,7 @@ import { router } from 'expo-router';
 import { useHealthStore } from '../../src/store/healthStore';
 import { useHealthData } from '../../src/hooks/useHealthData';
 import { generateInsights } from '../../src/services/LLMService';
-import { getDailyBrief, getDeepInsights, DailyBrief, DeepInsight } from '../../src/services/AIOptimizationService';
+import { getDailyBrief, fetchBriefAiText, getDeepInsights, DailyBrief, DeepInsight } from '../../src/services/AIOptimizationService';
 import { sendChatMessage, ChatMessage } from '../../src/services/ChatService';
 import { loadGoals, saveGoals } from '../../src/services/GoalsService';
 import { HealthGoals, DEFAULT_GOALS } from '../../src/models/Goals';
@@ -42,12 +42,13 @@ function TargetRow({ icon, label, value, color = '#94a3b8' }: {
 }
 
 export default function InsightsScreen() {
-  const { snapshots, latestInsight, setInsight } = useHealthStore();
+  const { snapshots, latestInsight, setInsight, cachedBrief, cachedBriefDate, cachedBriefAiText, setCachedBrief, setCachedBriefAiText } = useHealthStore();
   const { refresh } = useHealthData();
   const [goals, setGoals] = useState<HealthGoals>(DEFAULT_GOALS);
-  const [brief, setBrief] = useState<DailyBrief | null>(null);
+  const [brief, setBrief] = useState<DailyBrief | null>(cachedBrief);
   const [deepResult, setDeepResult] = useState<DeepInsight | null>(null);
   const [loadingBrief, setLoadingBrief] = useState(false);
+  const [loadingAiText, setLoadingAiText] = useState(false);
   const [loadingDeep, setLoadingDeep] = useState(false);
   const [loadingInsight, setLoadingInsight] = useState(false);
   const [loadingStep, setLoadingStep] = useState('');
@@ -62,11 +63,9 @@ export default function InsightsScreen() {
 
   useEffect(() => { loadGoals().then(setGoals); }, []);
 
-  // Auto-load morning brief when screen opens and we have data
+  // Auto-load brief when screen opens — pure local calc, no Gemini
   useEffect(() => {
-    if (snapshots.length > 0 && !brief && !loadingBrief) {
-      loadBrief();
-    }
+    if (snapshots.length > 0) loadBrief();
   }, [snapshots.length]);
 
   async function onRefresh() {
@@ -74,7 +73,7 @@ export default function InsightsScreen() {
     const currentGoals = await loadGoals();
     setGoals(currentGoals);
     await refresh();
-    loadBrief();
+    loadBrief(true); // force recompute on manual refresh
     setRefreshing(false);
   }
 
@@ -86,21 +85,44 @@ export default function InsightsScreen() {
     return current;
   }
 
-  async function loadBrief() {
-    const current = await ensureSnapshots();
-    if (current.length === 0) return;
+  const todayStr = new Date().toISOString().slice(0, 10);
 
-    setLoadingBrief(true);
+  function loadBrief(forceRefresh = false) {
+    const current = useHealthStore.getState().snapshots;
+    if (current.length === 0) return;
+    // Use cached brief if already computed today (unless forced)
+    if (!forceRefresh && cachedBriefDate === todayStr && cachedBrief) {
+      setBrief({ ...cachedBrief, aiText: cachedBriefAiText ?? undefined });
+      return;
+    }
+    loadGoals().then(currentGoals => {
+      setGoals(currentGoals);
+      const result = getDailyBrief(current[0], current, currentGoals);
+      const withAi = { ...result, aiText: cachedBriefAiText ?? undefined };
+      setBrief(withAi);
+      setCachedBrief(result, todayStr);
+    });
+  }
+
+  async function loadAiText() {
+    const current = useHealthStore.getState().snapshots;
+    if (!brief || current.length === 0) return;
+    // Already fetched AI text today — don't burn another quota slot
+    if (cachedBriefAiText && cachedBriefDate === todayStr) {
+      setBrief(prev => prev ? { ...prev, aiText: cachedBriefAiText } : prev);
+      return;
+    }
+    setLoadingAiText(true);
     setError(null);
     try {
       const currentGoals = await loadGoals();
-      setGoals(currentGoals);
-      const result = await getDailyBrief(current[0], current, currentGoals);
-      setBrief(result);
+      const text = await fetchBriefAiText(current[0], current, currentGoals, brief);
+      setCachedBriefAiText(text);
+      setBrief(prev => prev ? { ...prev, aiText: text } : prev);
     } catch (err: any) {
-      setError(err.message ?? 'Failed to generate daily brief');
+      setError(err.message ?? 'AI commentary unavailable');
     }
-    setLoadingBrief(false);
+    setLoadingAiText(false);
   }
 
   async function runDeepAnalysis() {
@@ -219,10 +241,18 @@ export default function InsightsScreen() {
         <View style={s.sectionHeaderRow}>
           <Ionicons name="sunny-outline" size={16} color="#fbbf24" />
           <Text style={s.sectionTitle}>  Today's Brief</Text>
-          <TouchableOpacity onPress={loadBrief} disabled={loadingBrief} style={{ marginLeft: 'auto' }}>
-            {loadingBrief
+          <TouchableOpacity
+            onPress={loadAiText}
+            disabled={loadingAiText}
+            style={[s.aiTextBtn, (cachedBriefAiText && cachedBriefDate === todayStr) && s.aiTextBtnDone]}
+          >
+            {loadingAiText
               ? <ActivityIndicator size="small" color="#34d399" />
-              : <Ionicons name="refresh-outline" size={16} color="#64748b" />}
+              : <><Ionicons name="sparkles" size={13} color={cachedBriefAiText && cachedBriefDate === todayStr ? '#475569' : '#34d399'} />
+                 <Text style={[s.aiTextBtnLabel, (cachedBriefAiText && cachedBriefDate === todayStr) && { color: '#475569' }]}>
+                   {cachedBriefAiText && cachedBriefDate === todayStr ? 'AI done' : 'Ask AI'}
+                 </Text></>
+            }
           </TouchableOpacity>
         </View>
 
@@ -233,7 +263,8 @@ export default function InsightsScreen() {
               <TargetRow icon="flame-outline"   label="Calories"   value={`${brief.calorieTarget} kcal`}  color="#f87171" />
               <TargetRow icon="barbell-outline" label="Protein"    value={`${brief.proteinTarget}g`}      color="#34d399" />
               <TargetRow icon="walk-outline"    label="Steps"      value={brief.stepTarget.toLocaleString()} color="#60a5fa" />
-              <TargetRow icon="moon-outline"    label="Sleep goal" value={`${brief.waterTarget}L water`}  color="#a78bfa" />
+              <TargetRow icon="moon-outline"    label="Sleep"      value={`${currentGoals.sleepHours ?? 8}h goal`} color="#a78bfa" />
+              <TargetRow icon="water-outline"   label="Water"      value={`${brief.waterTarget} cups`}    color="#38bdf8" />
             </View>
             <View style={s.workoutBox}>
               <Text style={s.workoutLabel}>Workout · {brief.workoutRecommendation.toUpperCase()}</Text>
@@ -249,15 +280,10 @@ export default function InsightsScreen() {
               <Text style={s.headlineText}>{brief.headline}</Text>
             ) : null}
           </>
-        ) : !loadingBrief ? (
-          <TouchableOpacity style={s.emptyBrief} onPress={loadBrief}>
-            <Ionicons name="sunny-outline" size={36} color="#334155" />
-            <Text style={s.emptyBriefText}>Tap to generate today's brief</Text>
-          </TouchableOpacity>
         ) : (
           <View style={s.loadingBox}>
             <ActivityIndicator color="#34d399" />
-            <Text style={s.loadingText}>Calculating recovery & targets…</Text>
+            <Text style={s.loadingText}>Loading health data…</Text>
           </View>
         )}
       </View>
@@ -470,6 +496,9 @@ const s = StyleSheet.create({
   headlineText: { fontSize: 12, color: '#475569', marginTop: 8, textAlign: 'center' },
   emptyBrief: { alignItems: 'center', gap: 10, paddingVertical: 30 },
   emptyBriefText: { fontSize: 14, color: '#475569' },
+  aiTextBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, marginLeft: 'auto', backgroundColor: '#0f172a', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 5 },
+  aiTextBtnDone: { opacity: 0.5 },
+  aiTextBtnLabel: { fontSize: 12, fontWeight: '600', color: '#34d399' },
   loadingBox: { alignItems: 'center', gap: 12, paddingVertical: 24 },
   loadingText: { fontSize: 13, color: '#64748b' },
   btn: { backgroundColor: '#34d399', borderRadius: 10, padding: 13, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6, marginBottom: 14 },
