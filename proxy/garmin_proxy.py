@@ -364,3 +364,123 @@ ACTIONS:
 @app.get("/health")
 def health():
     return {"status": "ok", "garmin_connected": client is not None, "ai": "gemini" if GEMINI_API_KEY else "not configured"}
+
+
+# ── Conversational AI chat ────────────────────────────────────────────────────
+
+class ChatMessage(BaseModel):
+    role: str    # "user" or "assistant"
+    content: str
+
+class ChatRequest(BaseModel):
+    messages: list[ChatMessage]
+    context: dict = {}   # snapshots[], goals{}, brief{}
+
+CHAT_SYSTEM_PROMPT = """You are a personal AI health coach with deep expertise in sports science, nutrition, and recovery optimization. You have full access to the user's real health data (Garmin, Apple Health, food logs, body composition) and you know their goals.
+
+Your personality: direct, evidence-based, warm but not fluffy. You reference actual numbers from their data. You explain your reasoning clearly when asked. You don't give generic advice — everything you say is grounded in their specific metrics.
+
+When the user asks you to take an action (update a goal, set a target, change a setting), respond with a clear confirmation AND append an ACTION block at the very end of your message in this exact format:
+ACTION_JSON: {"type": "update_goal", "field": "<fieldName>", "value": <value>}
+
+Supported action types and fields:
+- update_goal: dailySteps, dailyCalories, proteinG, carbsG, fatG, sleepHours, waterCups, fiberG, weeklyWorkouts, primaryGoal, currentWeightLbs, targetWeightLbs
+
+Only append ACTION_JSON when the user explicitly asks you to change or set something. For questions and explanations, just answer."""
+
+def format_chat_context(ctx: dict) -> str:
+    lines = ["=== YOUR HEALTH DATA ==="]
+
+    snaps = ctx.get("snapshots", [])
+    if snaps:
+        lines.append(f"\nLast {len(snaps)} days of biometrics:")
+        for s in snaps[:14]:
+            parts = [s.get("date", "?")]
+            if s.get("steps"):            parts.append(f"steps:{s['steps']:,}")
+            if s.get("bodyBattery"):      parts.append(f"BB:{s['bodyBattery']}")
+            if s.get("sleepHours"):       parts.append(f"sleep:{s['sleepHours']:.1f}h")
+            if s.get("sleepScore"):       parts.append(f"sleep_score:{s['sleepScore']}")
+            if s.get("hrv"):              parts.append(f"HRV:{s['hrv']}ms")
+            if s.get("restingHeartRate"): parts.append(f"RHR:{s['restingHeartRate']}")
+            if s.get("avgStress"):        parts.append(f"stress:{s['avgStress']}")
+            if s.get("activeCalories"):   parts.append(f"burn:{s['activeCalories']}")
+            if s.get("caloriesConsumed"): parts.append(f"ate:{s['caloriesConsumed']}kcal")
+            if s.get("proteinG"):         parts.append(f"P:{s['proteinG']}g")
+            if s.get("weightKg"):         parts.append(f"wt:{round(s['weightKg']*2.2046,1)}lbs")
+            if s.get("bodyFatPct"):       parts.append(f"bf:{s['bodyFatPct']}%")
+            lines.append("  " + " | ".join(parts))
+
+    g = ctx.get("goals", {})
+    if g:
+        lines.append("\n=== GOALS ===")
+        lines.append(f"Primary goal: {g.get('primaryGoal','general_health')}")
+        lines.append(f"Daily calories: {g.get('dailyCalories','?')} kcal")
+        lines.append(f"Protein: {g.get('proteinG','?')}g | Carbs: {g.get('carbsG','?')}g | Fat: {g.get('fatG','?')}g")
+        lines.append(f"Steps: {g.get('dailySteps','?')} | Sleep: {g.get('sleepHours','?')}h | Water: {g.get('waterCups','?')} cups")
+        if g.get("currentWeightLbs"): lines.append(f"Weight: {g['currentWeightLbs']}lbs → target: {g.get('targetWeightLbs','?')}lbs")
+        if g.get("targetRacePaceMinPerKm"): lines.append(f"Race: {g.get('raceDistanceKm','?')}km at {g['targetRacePaceMinPerKm']} min/km by {g.get('targetRaceDate','?')}")
+
+    brief = ctx.get("brief", {})
+    if brief:
+        lines.append("\n=== TODAY'S BRIEF ===")
+        lines.append(f"Recovery score: {brief.get('recoveryScore','?')}/100 ({brief.get('recoveryLabel','?')})")
+        lines.append(f"Today's targets: {brief.get('calorieTarget','?')} kcal, {brief.get('proteinTarget','?')}g protein, {brief.get('stepTarget','?')} steps")
+        lines.append(f"Workout recommendation: {brief.get('workoutRecommendation','?')} — {brief.get('workoutReason','')}")
+        if brief.get("aiText"): lines.append(f"AI note: {brief['aiText']}")
+
+    return "\n".join(lines)
+
+
+@app.post("/chat")
+async def chat(req: ChatRequest):
+    if not GEMINI_API_KEY:
+        raise HTTPException(status_code=503, detail="GEMINI_API_KEY not configured")
+    if not req.messages:
+        raise HTTPException(status_code=400, detail="No messages provided")
+
+    context_str = format_chat_context(req.context)
+
+    # Build Gemini history (all but the last user message)
+    history = []
+    for msg in req.messages[:-1]:
+        role = "model" if msg.role == "assistant" else "user"
+        history.append({"role": role, "parts": [msg.content]})
+
+    last_message = req.messages[-1].content
+
+    try:
+        model = genai.GenerativeModel(
+            GEMINI_MODEL,
+            system_instruction=f"{CHAT_SYSTEM_PROMPT}\n\n{context_str}",
+            generation_config=genai.GenerationConfig(
+                max_output_tokens=1024,
+                temperature=0.7,
+            ),
+        )
+
+        chat_session = model.start_chat(history=history)
+
+        loop = asyncio.get_event_loop()
+        response = await loop.run_in_executor(None, chat_session.send_message, last_message)
+        text = response.text
+
+        # Parse optional action from response
+        action = None
+        action_marker = "ACTION_JSON:"
+        if action_marker in text:
+            try:
+                action_str = text.split(action_marker, 1)[1].strip()
+                # Extract just the JSON object
+                import json, re
+                match = re.search(r'\{.*?\}', action_str, re.DOTALL)
+                if match:
+                    action = json.loads(match.group())
+                    # Strip the action line from the displayed text
+                    text = text.split(action_marker, 1)[0].strip()
+            except Exception:
+                pass
+
+        return {"reply": text, "action": action, "model": GEMINI_MODEL}
+
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"AI error: {e}")

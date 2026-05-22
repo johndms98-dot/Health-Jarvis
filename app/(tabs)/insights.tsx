@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  ActivityIndicator, RefreshControl,
+  ActivityIndicator, RefreshControl, TextInput, KeyboardAvoidingView,
+  Platform, Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -9,7 +10,8 @@ import { useHealthStore } from '../../src/store/healthStore';
 import { useHealthData } from '../../src/hooks/useHealthData';
 import { generateInsights } from '../../src/services/LLMService';
 import { getDailyBrief, getDeepInsights, DailyBrief, DeepInsight } from '../../src/services/AIOptimizationService';
-import { loadGoals } from '../../src/services/GoalsService';
+import { sendChatMessage, ChatMessage } from '../../src/services/ChatService';
+import { loadGoals, saveGoals } from '../../src/services/GoalsService';
 import { HealthGoals, DEFAULT_GOALS } from '../../src/models/Goals';
 
 // ── Recovery score display ────────────────────────────────────────────────────
@@ -51,6 +53,12 @@ export default function InsightsScreen() {
   const [loadingStep, setLoadingStep] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+
+  // Chat state
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatInput, setChatInput] = useState('');
+  const [chatLoading, setChatLoading] = useState(false);
+  const scrollRef = useRef<ScrollView>(null);
 
   useEffect(() => { loadGoals().then(setGoals); }, []);
 
@@ -129,11 +137,64 @@ export default function InsightsScreen() {
     setLoadingInsight(false);
   }
 
+  async function sendChat() {
+    const text = chatInput.trim();
+    if (!text || chatLoading) return;
+    const userMsg: ChatMessage = { role: 'user', content: text };
+    const updated = [...chatMessages, userMsg];
+    setChatMessages(updated);
+    setChatInput('');
+    setChatLoading(true);
+    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
+    try {
+      const currentGoals = await loadGoals();
+      const res = await sendChatMessage(updated, snapshots, currentGoals, brief);
+      const assistantMsg: ChatMessage = { role: 'assistant', content: res.reply };
+      setChatMessages(prev => [...prev, assistantMsg]);
+      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
+
+      // Handle AI-requested actions
+      if (res.action?.type === 'update_goal') {
+        const { field, value } = res.action;
+        Alert.alert(
+          'Apply change?',
+          `Set ${field} to ${value}?`,
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Apply',
+              onPress: async () => {
+                try {
+                  const current = await loadGoals();
+                  const updated = { ...current, [field]: value };
+                  await saveGoals(updated);
+                  setGoals(updated);
+                  const confirmMsg: ChatMessage = { role: 'assistant', content: `✓ Done — ${field} updated to ${value}.` };
+                  setChatMessages(prev => [...prev, confirmMsg]);
+                } catch {
+                  const errMsg: ChatMessage = { role: 'assistant', content: "Sorry, I couldn't save that change. Please update it manually in Goals." };
+                  setChatMessages(prev => [...prev, errMsg]);
+                }
+              },
+            },
+          ],
+        );
+      }
+    } catch (err: any) {
+      const errMsg: ChatMessage = { role: 'assistant', content: `Sorry, something went wrong: ${err.message ?? 'unknown error'}` };
+      setChatMessages(prev => [...prev, errMsg]);
+    }
+    setChatLoading(false);
+  }
+
   return (
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
     <ScrollView
+      ref={scrollRef}
       style={s.container}
       contentContainerStyle={s.content}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#34d399" />}
+      keyboardShouldPersistTaps="handled"
     >
       <View style={s.headerRow}>
         <View>
@@ -304,7 +365,77 @@ export default function InsightsScreen() {
           </View>
         )}
       </View>
+
+      {/* ── Ask the AI ────────────────────────────────────────────────────── */}
+      <View style={s.section}>
+        <View style={s.sectionHeaderRow}>
+          <Ionicons name="chatbubble-ellipses-outline" size={16} color="#34d399" />
+          <Text style={s.sectionTitle}>  Ask the AI</Text>
+          {chatMessages.length > 0 && (
+            <TouchableOpacity onPress={() => setChatMessages([])} style={{ marginLeft: 'auto' }}>
+              <Text style={{ fontSize: 12, color: '#475569' }}>Clear</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+        <Text style={s.sectionDesc}>
+          Ask why conclusions were made, explore your data, or say "set my step goal to 12,000" to take action.
+        </Text>
+
+        {chatMessages.length === 0 && (
+          <View style={s.chatSuggestions}>
+            {[
+              'Why is my recovery score low?',
+              "What's driving my weight trend?",
+              'Set my protein goal to 180g',
+            ].map(q => (
+              <TouchableOpacity key={q} style={s.suggestionChip} onPress={() => { setChatInput(q); }}>
+                <Text style={s.suggestionText}>{q}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+
+        {chatMessages.map((msg, i) => (
+          <View key={i} style={[s.chatBubble, msg.role === 'user' ? s.chatBubbleUser : s.chatBubbleAI]}>
+            {msg.role === 'assistant' && (
+              <Ionicons name="sparkles" size={12} color="#34d399" style={{ marginBottom: 4 }} />
+            )}
+            <Text style={[s.chatBubbleText, msg.role === 'user' && s.chatBubbleTextUser]}>
+              {msg.content}
+            </Text>
+          </View>
+        ))}
+
+        {chatLoading && (
+          <View style={[s.chatBubble, s.chatBubbleAI]}>
+            <ActivityIndicator size="small" color="#34d399" />
+          </View>
+        )}
+      </View>
     </ScrollView>
+
+    {/* Pinned chat input */}
+    <View style={s.chatInputBar}>
+      <TextInput
+        style={s.chatInput}
+        value={chatInput}
+        onChangeText={setChatInput}
+        placeholder="Ask anything about your health data…"
+        placeholderTextColor="#475569"
+        multiline
+        maxLength={500}
+        returnKeyType="send"
+        onSubmitEditing={sendChat}
+      />
+      <TouchableOpacity
+        style={[s.chatSendBtn, (!chatInput.trim() || chatLoading) && s.chatSendBtnDisabled]}
+        onPress={sendChat}
+        disabled={!chatInput.trim() || chatLoading}
+      >
+        <Ionicons name="send" size={18} color={chatInput.trim() && !chatLoading ? '#0f172a' : '#475569'} />
+      </TouchableOpacity>
+    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -357,4 +488,17 @@ const s = StyleSheet.create({
   deepItem: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginBottom: 8 },
   deepBullet: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#a78bfa', marginTop: 6 },
   deepItemText: { fontSize: 14, color: '#e2e8f0', flex: 1, lineHeight: 20 },
+  // Chat
+  chatSuggestions: { gap: 8, marginBottom: 4 },
+  suggestionChip: { backgroundColor: '#0f172a', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8, alignSelf: 'flex-start' },
+  suggestionText: { fontSize: 13, color: '#64748b' },
+  chatBubble: { borderRadius: 14, padding: 12, marginBottom: 8, maxWidth: '90%' },
+  chatBubbleUser: { backgroundColor: '#1d4ed8', alignSelf: 'flex-end' },
+  chatBubbleAI: { backgroundColor: '#0f172a', alignSelf: 'flex-start' },
+  chatBubbleText: { fontSize: 14, color: '#e2e8f0', lineHeight: 20 },
+  chatBubbleTextUser: { color: '#fff' },
+  chatInputBar: { flexDirection: 'row', alignItems: 'flex-end', gap: 10, padding: 12, paddingBottom: 28, backgroundColor: '#1e293b', borderTopWidth: 1, borderTopColor: '#334155' },
+  chatInput: { flex: 1, backgroundColor: '#0f172a', borderRadius: 20, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 10, fontSize: 14, color: '#f1f5f9', maxHeight: 100 },
+  chatSendBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#34d399', alignItems: 'center', justifyContent: 'center' },
+  chatSendBtnDisabled: { backgroundColor: '#1e293b' },
 });

@@ -9,8 +9,11 @@
 import { getCustomFoodByBarcode, searchCustomFoods, CustomFood, FoodLog } from './SupabaseService';
 
 const USDA_API_KEY = process.env.EXPO_PUBLIC_USDA_API_KEY ?? 'DEMO_KEY';
-const OFF_BASE = 'https://world.openfoodfacts.org';
-const USDA_BASE = 'https://api.nal.usda.gov/fdc/v1';
+const NUTRITIONIX_APP_ID  = process.env.EXPO_PUBLIC_NUTRITIONIX_APP_ID ?? '';
+const NUTRITIONIX_APP_KEY = process.env.EXPO_PUBLIC_NUTRITIONIX_APP_KEY ?? '';
+const OFF_BASE   = 'https://world.openfoodfacts.org';
+const USDA_BASE  = 'https://api.nal.usda.gov/fdc/v1';
+const NTRX_BASE  = 'https://trackapi.nutritionix.com/v2';
 
 // ─── Normalised food result ───────────────────────────────────────────────────
 
@@ -127,37 +130,129 @@ function parseUSDAFood(f: any): FoodResult | null {
   };
 }
 
+// ─── Nutritionix ─────────────────────────────────────────────────────────────
+
+function ntrxHeaders() {
+  return {
+    'x-app-id':  NUTRITIONIX_APP_ID,
+    'x-app-key': NUTRITIONIX_APP_KEY,
+    'Content-Type': 'application/json',
+  };
+}
+
+function parseNtrxItem(item: any): FoodResult | null {
+  const cal = item.nf_calories;
+  if (!cal) return null;
+  return {
+    name: item.food_name ?? 'Unknown',
+    brand: item.brand_name,
+    barcode: item.upc,
+    source: 'open_food_facts', // reuse existing source type; treated as branded
+    source_id: item.nix_item_id ?? item.tag_id,
+    serving_qty: item.serving_qty ?? 1,
+    serving_unit: item.serving_unit ?? 'serving',
+    serving_weight_g: item.serving_weight_grams,
+    calories: Math.round(cal),
+    protein_g: round1(item.nf_protein ?? 0),
+    carbs_g: round1(item.nf_total_carbohydrate ?? 0),
+    fat_g: round1(item.nf_total_fat ?? 0),
+    fiber_g: round1opt(item.nf_dietary_fiber),
+    sugar_g: round1opt(item.nf_sugars),
+    sodium_mg: round1opt(item.nf_sodium),
+    saturated_fat_g: round1opt(item.nf_saturated_fat),
+    cholesterol_mg: round1opt(item.nf_cholesterol),
+    potassium_mg: round1opt(item.nf_potassium),
+  };
+}
+
+/** Nutritionix instant search — covers branded items + restaurant chains */
+async function searchNutritionix(query: string): Promise<FoodResult[]> {
+  if (!NUTRITIONIX_APP_ID || !NUTRITIONIX_APP_KEY) return [];
+  try {
+    const res = await fetch(
+      `${NTRX_BASE}/search/instant?query=${encodeURIComponent(query)}&branded=true&common=true&self=false`,
+      { headers: ntrxHeaders() },
+    );
+    if (!res.ok) return [];
+    const json = await res.json();
+    const branded: FoodResult[] = (json.branded ?? []).map(parseNtrxItem).filter(Boolean) as FoodResult[];
+    const common: FoodResult[] = (json.common ?? []).map((item: any) => ({
+      name: item.food_name,
+      source: 'usda' as const,
+      source_id: item.tag_id,
+      serving_qty: item.serving_qty ?? 1,
+      serving_unit: item.serving_unit ?? 'serving',
+      serving_weight_g: item.serving_weight_grams,
+      // Nutritionix common items don't include full macros — calories approximated
+      calories: item.nf_calories ?? 0,
+      protein_g: 0, carbs_g: 0, fat_g: 0,
+    })).filter((f: FoodResult) => f.calories > 0);
+    return [...branded, ...common].slice(0, 15);
+  } catch { return []; }
+}
+
+/** Nutritionix nutrients — get full macros for a natural-language query */
+export async function nutritionixNaturalQuery(query: string): Promise<FoodResult[]> {
+  if (!NUTRITIONIX_APP_ID || !NUTRITIONIX_APP_KEY) return [];
+  try {
+    const res = await fetch(`${NTRX_BASE}/natural/nutrients`, {
+      method: 'POST',
+      headers: ntrxHeaders(),
+      body: JSON.stringify({ query }),
+    });
+    if (!res.ok) return [];
+    const json = await res.json();
+    return (json.foods ?? []).map(parseNtrxItem).filter(Boolean) as FoodResult[];
+  } catch { return []; }
+}
+
+/** Nutritionix barcode lookup */
+async function lookupNutritionixBarcode(barcode: string): Promise<FoodResult | null> {
+  if (!NUTRITIONIX_APP_ID || !NUTRITIONIX_APP_KEY) return null;
+  try {
+    const res = await fetch(`${NTRX_BASE}/search/item?upc=${barcode}`, { headers: ntrxHeaders() });
+    if (!res.ok) return null;
+    const json = await res.json();
+    const item = json.foods?.[0];
+    return item ? parseNtrxItem(item) : null;
+  } catch { return null; }
+}
+
 // ─── Public API ───────────────────────────────────────────────────────────────
 
-/** Look up by barcode — tries custom foods, then OFF, then USDA */
+/** Look up by barcode — custom → Nutritionix → Open Food Facts → USDA */
 export async function lookupBarcode(barcode: string): Promise<FoodResult | null> {
   // 1. User's own saved foods
   const custom = await getCustomFoodByBarcode(barcode);
   if (custom) return customToResult(custom);
-  // 2. Open Food Facts
+  // 2. Nutritionix (best branded coverage)
+  const ntrx = await lookupNutritionixBarcode(barcode);
+  if (ntrx) return ntrx;
+  // 3. Open Food Facts (global, 3M+ products)
   const off = await lookupOFF(barcode);
   if (off) return off;
-  // 3. USDA (rare for barcodes but worth trying)
+  // 4. USDA fallback
   const usdaResults = await searchUSDA(barcode);
   return usdaResults[0] ?? null;
 }
 
-/** Text search — combines OFF + USDA + custom foods */
+/** Text search — Nutritionix + OFF + USDA + custom foods, deduplicated */
 export async function searchFood(query: string): Promise<FoodResult[]> {
-  const [offResults, usdaResults, customResults] = await Promise.all([
+  const [ntrxResults, offResults, usdaResults, customResults] = await Promise.all([
+    searchNutritionix(query),
     searchOFF(query),
     searchUSDA(query),
     searchCustomFoods(query),
   ]);
   const customMapped = customResults.map(customToResult);
-  // Deduplicate by name+brand, prefer custom > OFF > USDA
+  // Priority: custom > Nutritionix (best macro data) > OFF > USDA
   const seen = new Set<string>();
   const combined: FoodResult[] = [];
-  for (const item of [...customMapped, ...offResults, ...usdaResults]) {
+  for (const item of [...customMapped, ...ntrxResults, ...offResults, ...usdaResults]) {
     const key = `${item.name.toLowerCase()}|${(item.brand ?? '').toLowerCase()}`;
     if (!seen.has(key)) { seen.add(key); combined.push(item); }
   }
-  return combined.slice(0, 20);
+  return combined.slice(0, 25);
 }
 
 /** Convert a FoodResult to a FoodLog entry ready to insert */
