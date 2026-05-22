@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Health Dashboard",
+    "name": "Health Jarvis",
     "slug": "health-dashboard",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -27,8 +27,8 @@
       "favicon": "./assets/icon.png",
       "backgroundColor": "#0f172a",
       "themeColor": "#0f172a",
-      "name": "Health Dashboard",
-      "shortName": "Health",
+      "name": "Health Jarvis",
+      "shortName": "Jarvis",
       "display": "standalone",
       "orientation": "portrait",
       "startUrl": "/"
@@ -47,7 +47,7 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow Health Dashboard to use your camera to scan food barcodes."
+          "cameraPermission": "Allow Health Jarvis to use your camera to scan food barcodes."
         }
       ]
     ],
