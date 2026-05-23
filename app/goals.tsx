@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { loadGoals, saveGoals } from '../src/services/GoalsService';
 import { HealthGoals, DEFAULT_GOALS } from '../src/models/Goals';
+import { C } from '../constants/Theme';
 
 function Field({
   label, value, onChangeText, unit, keyboardType = 'decimal-pad', placeholder,
@@ -165,26 +166,26 @@ function Section({ title, icon, children }: { title: string; icon: string; child
 }
 
 const field = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: '#0f172a' },
-  label: { fontSize: 14, color: '#cbd5e1', flex: 1 },
+  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: C.bgInset },
+  label: { fontSize: 14, color: C.textDefault, flex: 1 },
   inputWrap: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  input: { backgroundColor: '#0f172a', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7, fontSize: 14, color: '#f1f5f9', minWidth: 72, textAlign: 'right' },
-  unit: { fontSize: 13, color: '#64748b', minWidth: 42 },
+  input: { backgroundColor: C.bgInset, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7, fontSize: 14, color: C.textBright, minWidth: 72, textAlign: 'right' },
+  unit: { fontSize: 13, color: C.textTertiary, minWidth: 42 },
 });
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0f172a' },
+  container: { flex: 1, backgroundColor: C.bg },
   content: { padding: 16, paddingTop: 56, paddingBottom: 48 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 },
   backButton: { padding: 4 },
-  title: { fontSize: 20, fontWeight: '700', color: '#f1f5f9' },
-  resetText: { fontSize: 14, color: '#64748b' },
+  title: { fontSize: 20, fontWeight: '700', color: C.textBright },
+  resetText: { fontSize: 14, color: C.textTertiary },
   section: { marginBottom: 20 },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
-  sectionTitle: { fontSize: 12, fontWeight: '600', color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.7 },
-  sectionBody: { backgroundColor: '#1e293b', borderRadius: 12, paddingHorizontal: 14 },
+  sectionTitle: { fontSize: 12, fontWeight: '600', color: C.textTertiary, textTransform: 'uppercase', letterSpacing: 0.7 },
+  sectionBody: { backgroundColor: C.bgCard, borderRadius: 12, paddingHorizontal: 14, borderWidth: 1, borderColor: C.border },
   note: { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 10 },
-  noteText: { fontSize: 12, color: '#475569', flex: 1, lineHeight: 18 },
-  saveButton: { backgroundColor: '#34d399', borderRadius: 12, paddingVertical: 15, alignItems: 'center', marginTop: 8 },
-  saveButtonText: { fontSize: 16, fontWeight: '700', color: '#0f172a' },
+  noteText: { fontSize: 12, color: C.textMuted, flex: 1, lineHeight: 18 },
+  saveButton: { backgroundColor: C.primary, borderRadius: 12, paddingVertical: 15, alignItems: 'center', marginTop: 8 },
+  saveButtonText: { fontSize: 16, fontWeight: '700', color: C.bg },
 });

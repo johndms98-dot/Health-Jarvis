@@ -7,6 +7,7 @@
  */
 
 import { getCustomFoodByBarcode, searchCustomFoods, CustomFood, FoodLog } from './SupabaseService';
+import { searchBuiltin } from './BuiltinFoodDatabase';
 
 const USDA_API_KEY = process.env.EXPO_PUBLIC_USDA_API_KEY ?? 'DEMO_KEY';
 const NUTRITIONIX_APP_ID  = process.env.EXPO_PUBLIC_NUTRITIONIX_APP_ID ?? '';
@@ -183,9 +184,13 @@ async function searchNutritionix(query: string): Promise<FoodResult[]> {
       serving_qty: item.serving_qty ?? 1,
       serving_unit: item.serving_unit ?? 'serving',
       serving_weight_g: item.serving_weight_grams,
-      // Nutritionix common items don't include full macros — calories approximated
-      calories: item.nf_calories ?? 0,
-      protein_g: 0, carbs_g: 0, fat_g: 0,
+      calories: Math.round(item.nf_calories ?? 0),
+      protein_g: round1(item.nf_protein ?? 0),
+      carbs_g: round1(item.nf_total_carbohydrate ?? 0),
+      fat_g: round1(item.nf_total_fat ?? 0),
+      fiber_g: round1opt(item.nf_dietary_fiber),
+      sugar_g: round1opt(item.nf_sugars),
+      sodium_mg: round1opt(item.nf_sodium),
     })).filter((f: FoodResult) => f.calories > 0);
     return [...branded, ...common].slice(0, 15);
   } catch { return []; }
@@ -220,39 +225,49 @@ async function lookupNutritionixBarcode(barcode: string): Promise<FoodResult | n
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
-/** Look up by barcode — custom → Nutritionix → Open Food Facts → USDA */
+/** Look up by barcode — custom first, then external sources in parallel */
 export async function lookupBarcode(barcode: string): Promise<FoodResult | null> {
-  // 1. User's own saved foods
   const custom = await getCustomFoodByBarcode(barcode);
   if (custom) return customToResult(custom);
-  // 2. Nutritionix (best branded coverage)
-  const ntrx = await lookupNutritionixBarcode(barcode);
-  if (ntrx) return ntrx;
-  // 3. Open Food Facts (global, 3M+ products)
-  const off = await lookupOFF(barcode);
-  if (off) return off;
-  // 4. USDA fallback
-  const usdaResults = await searchUSDA(barcode);
-  return usdaResults[0] ?? null;
+
+  const [ntrx, off, usdaResults] = await Promise.all([
+    lookupNutritionixBarcode(barcode),
+    lookupOFF(barcode),
+    searchUSDA(barcode),
+  ]);
+  return ntrx ?? off ?? usdaResults[0] ?? null;
 }
 
-/** Text search — Nutritionix + OFF + USDA + custom foods, deduplicated */
+/** Returns true if the food name contains at least one query word */
+function isRelevant(item: FoodResult, query: string): boolean {
+  const words = query.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+  if (words.length === 0) return true;
+  const haystack = `${item.name} ${item.brand ?? ''}`.toLowerCase();
+  // Match if any word appears in the name/brand (substring ok — covers abbreviations)
+  return words.some(w => haystack.includes(w));
+}
+
+/** Text search — built-in database first (instant), then API sources in parallel */
 export async function searchFood(query: string): Promise<FoodResult[]> {
-  const [ntrxResults, offResults, usdaResults, customResults] = await Promise.all([
+  const [naturalResults, ntrxResults, usdaResults, offResults, customResults] = await Promise.all([
+    nutritionixNaturalQuery(query),
     searchNutritionix(query),
-    searchOFF(query),
     searchUSDA(query),
+    searchOFF(query),
     searchCustomFoods(query),
   ]);
+  const builtinResults = searchBuiltin(query);
   const customMapped = customResults.map(customToResult);
-  // Priority: custom > Nutritionix (best macro data) > OFF > USDA
+
+  // Priority: custom → built-in (alcohol/common) → natural lang → USDA → Nutritionix → OFF
   const seen = new Set<string>();
   const combined: FoodResult[] = [];
-  for (const item of [...customMapped, ...ntrxResults, ...offResults, ...usdaResults]) {
+  for (const item of [...customMapped, ...builtinResults, ...naturalResults, ...usdaResults, ...ntrxResults, ...offResults]) {
+    if (!isRelevant(item, query)) continue;
     const key = `${item.name.toLowerCase()}|${(item.brand ?? '').toLowerCase()}`;
     if (!seen.has(key)) { seen.add(key); combined.push(item); }
   }
-  return combined.slice(0, 25);
+  return combined.slice(0, 30);
 }
 
 /** Convert a FoodResult to a FoodLog entry ready to insert */

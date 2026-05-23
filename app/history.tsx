@@ -9,6 +9,7 @@ import { fetchGarminSnapshot } from '../src/services/GarminService';
 import { fetchNutrition } from '../src/services/MFPService';
 import { HealthSnapshot } from '../src/models/HealthSnapshot';
 import { kgToLbs } from '../src/utils/units';
+import { C } from '../constants/Theme';
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -196,35 +197,35 @@ export default function HistoryScreen() {
 }
 
 const card = StyleSheet.create({
-  base: { backgroundColor: '#1e293b', borderRadius: 12, padding: 14, marginBottom: 8 },
-  expanded: { borderColor: '#334155', borderWidth: 1 },
+  base: { backgroundColor: C.bgCard, borderRadius: 12, padding: 14, marginBottom: 8, borderWidth: 1, borderColor: C.border },
+  expanded: { borderColor: C.borderLight },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  date: { fontSize: 14, fontWeight: '600', color: '#f1f5f9' },
+  date: { fontSize: 14, fontWeight: '600', color: C.textBright },
   pillRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  detail: { marginTop: 14, borderTopWidth: 1, borderTopColor: '#334155', paddingTop: 12 },
+  detail: { marginTop: 14, borderTopWidth: 1, borderTopColor: C.border, paddingTop: 12 },
   detailGrid: { gap: 8 },
 });
 
 const pill = StyleSheet.create({
   wrap: { alignItems: 'center' },
   value: { fontSize: 15, fontWeight: '700' },
-  label: { fontSize: 10, color: '#475569', marginTop: 1 },
+  label: { fontSize: 10, color: C.textMuted, marginTop: 1 },
 });
 
 const detail = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  label: { fontSize: 13, color: '#64748b', flex: 1 },
-  value: { fontSize: 13, fontWeight: '600', color: '#f1f5f9' },
+  label: { fontSize: 13, color: C.textTertiary, flex: 1 },
+  value: { fontSize: 13, fontWeight: '600', color: C.textBright },
 });
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0f172a' },
+  container: { flex: 1, backgroundColor: C.bg },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, paddingTop: 56 },
   backButton: { padding: 4 },
-  title: { fontSize: 20, fontWeight: '700', color: '#f1f5f9' },
-  loadMore: { fontSize: 14, color: '#34d399' },
+  title: { fontSize: 20, fontWeight: '700', color: C.textBright },
+  loadMore: { fontSize: 14, color: C.primary },
   content: { padding: 16, paddingTop: 0, paddingBottom: 40 },
-  empty: { fontSize: 14, color: '#475569', textAlign: 'center', marginTop: 40 },
-  loadMoreButton: { backgroundColor: '#1e293b', borderRadius: 10, paddingVertical: 12, alignItems: 'center', marginTop: 8 },
-  loadMoreButtonText: { fontSize: 14, color: '#34d399' },
+  empty: { fontSize: 14, color: C.textMuted, textAlign: 'center', marginTop: 40 },
+  loadMoreButton: { backgroundColor: C.bgCard, borderRadius: 10, paddingVertical: 12, alignItems: 'center', marginTop: 8, borderWidth: 1, borderColor: C.border },
+  loadMoreButtonText: { fontSize: 14, color: C.primary },
 });

@@ -1,7 +1,4 @@
-// Garmin proxy — Railway cloud (always on, works anywhere)
-// Set EXPO_PUBLIC_GARMIN_PROXY in .env.local to your Railway URL
-export const GARMIN_PROXY = process.env.EXPO_PUBLIC_GARMIN_PROXY
-  ?? `http://${process.env.EXPO_PUBLIC_MAC_HOST ?? '192.168.1.158'}:8765`;
+export const GARMIN_PROXY = process.env.EXPO_PUBLIC_GARMIN_PROXY ?? '';
 
 // Withings OAuth
 export const WITHINGS_CLIENT_ID     = process.env.EXPO_PUBLIC_WITHINGS_CLIENT_ID ?? '';

@@ -13,6 +13,7 @@ import { getDailyBrief, fetchBriefAiText, getDeepInsights, DailyBrief, DeepInsig
 import { sendChatMessage, ChatMessage } from '../../src/services/ChatService';
 import { loadGoals, saveGoals } from '../../src/services/GoalsService';
 import { HealthGoals, DEFAULT_GOALS } from '../../src/models/Goals';
+import { C } from '../../constants/Theme';
 
 // ── Recovery score display ────────────────────────────────────────────────────
 function RecoveryRing({ score, label }: { score: number; label: string }) {
@@ -231,7 +232,7 @@ export default function InsightsScreen() {
 
       {error && (
         <View style={s.errorCard}>
-          <Ionicons name="warning" size={15} color="#f87171" />
+          <Ionicons name="warning" size={15} color={C.danger} />
           <Text style={s.errorText}> {error}</Text>
         </View>
       )}
@@ -247,7 +248,7 @@ export default function InsightsScreen() {
             style={[s.aiTextBtn, (cachedBriefAiText && cachedBriefDate === todayStr) && s.aiTextBtnDone]}
           >
             {loadingAiText
-              ? <ActivityIndicator size="small" color="#34d399" />
+              ? <ActivityIndicator size="small" color={C.primary} />
               : <><Ionicons name="sparkles" size={13} color={cachedBriefAiText && cachedBriefDate === todayStr ? '#475569' : '#34d399'} />
                  <Text style={[s.aiTextBtnLabel, (cachedBriefAiText && cachedBriefDate === todayStr) && { color: '#475569' }]}>
                    {cachedBriefAiText && cachedBriefDate === todayStr ? 'AI done' : 'Ask AI'}
@@ -260,8 +261,8 @@ export default function InsightsScreen() {
           <>
             <RecoveryRing score={brief.recoveryScore} label={brief.recoveryLabel} />
             <View style={s.targetsBox}>
-              <TargetRow icon="flame-outline"   label="Calories"   value={`${brief.calorieTarget} kcal`}  color="#f87171" />
-              <TargetRow icon="barbell-outline" label="Protein"    value={`${brief.proteinTarget}g`}      color="#34d399" />
+              <TargetRow icon="flame-outline"   label="Calories"   value={`${brief.calorieTarget} kcal`}  color={C.danger} />
+              <TargetRow icon="barbell-outline" label="Protein"    value={`${brief.proteinTarget}g`}      color={C.primary} />
               <TargetRow icon="walk-outline"    label="Steps"      value={brief.stepTarget.toLocaleString()} color="#60a5fa" />
               <TargetRow icon="moon-outline"    label="Sleep"      value={`${goals.sleepHours ?? 8}h goal`} color="#a78bfa" />
               <TargetRow icon="water-outline"   label="Water"      value={`${brief.waterTarget} cups`}    color="#38bdf8" />
@@ -272,7 +273,7 @@ export default function InsightsScreen() {
             </View>
             {brief.aiText ? (
               <View style={s.aiMessageBox}>
-                <Ionicons name="sparkles" size={14} color="#34d399" />
+                <Ionicons name="sparkles" size={14} color={C.primary} />
                 <Text style={s.aiMessageText}>{brief.aiText}</Text>
               </View>
             ) : null}
@@ -282,7 +283,7 @@ export default function InsightsScreen() {
           </>
         ) : (
           <View style={s.loadingBox}>
-            <ActivityIndicator color="#34d399" />
+            <ActivityIndicator color={C.primary} />
             <Text style={s.loadingText}>Loading health data…</Text>
           </View>
         )}
@@ -302,8 +303,8 @@ export default function InsightsScreen() {
           disabled={loadingInsight}
         >
           {loadingInsight
-            ? <ActivityIndicator color="#0f172a" size="small" />
-            : <><Ionicons name="sparkles" size={15} color="#0f172a" /><Text style={s.btnText}> Analyze This Week</Text></>}
+            ? <ActivityIndicator color={C.bg} size="small" />
+            : <><Ionicons name="sparkles" size={15} color={C.bg} /><Text style={s.btnText}> Analyze This Week</Text></>}
         </TouchableOpacity>
 
         {latestInsight && (
@@ -313,7 +314,7 @@ export default function InsightsScreen() {
             </Text>
             <Text style={s.insightText}>{latestInsight.text}</Text>
             <View style={s.modelBadge}>
-              <Ionicons name="hardware-chip-outline" size={11} color="#475569" />
+              <Ionicons name="hardware-chip-outline" size={11} color={C.textMuted} />
               <Text style={s.modelText}> Gemini 2.0 Flash · cloud AI</Text>
             </View>
           </View>
@@ -375,7 +376,7 @@ export default function InsightsScreen() {
                 <Text style={s.deepSectionTitle}>Actions to Take</Text>
                 {deepResult.actions.map((a, i) => (
                   <View key={i} style={s.deepItem}>
-                    <Ionicons name="checkmark-circle-outline" size={14} color="#34d399" style={{ marginTop: 2 }} />
+                    <Ionicons name="checkmark-circle-outline" size={14} color={C.primary} style={{ marginTop: 2 }} />
                     <Text style={s.deepItemText}>{a}</Text>
                   </View>
                 ))}
@@ -385,7 +386,7 @@ export default function InsightsScreen() {
               <Text style={s.insightText}>{deepResult.raw}</Text>
             )}
             <View style={s.modelBadge}>
-              <Ionicons name="hardware-chip-outline" size={11} color="#475569" />
+              <Ionicons name="hardware-chip-outline" size={11} color={C.textMuted} />
               <Text style={s.modelText}> Gemini 2.0 Flash · {snapshots.length} days analyzed</Text>
             </View>
           </View>
@@ -395,7 +396,7 @@ export default function InsightsScreen() {
       {/* ── Ask the AI ────────────────────────────────────────────────────── */}
       <View style={s.section}>
         <View style={s.sectionHeaderRow}>
-          <Ionicons name="chatbubble-ellipses-outline" size={16} color="#34d399" />
+          <Ionicons name="chatbubble-ellipses-outline" size={16} color={C.primary} />
           <Text style={s.sectionTitle}>  Ask the AI</Text>
           {chatMessages.length > 0 && (
             <TouchableOpacity onPress={() => setChatMessages([])} style={{ marginLeft: 'auto' }}>
@@ -424,7 +425,7 @@ export default function InsightsScreen() {
         {chatMessages.map((msg, i) => (
           <View key={i} style={[s.chatBubble, msg.role === 'user' ? s.chatBubbleUser : s.chatBubbleAI]}>
             {msg.role === 'assistant' && (
-              <Ionicons name="sparkles" size={12} color="#34d399" style={{ marginBottom: 4 }} />
+              <Ionicons name="sparkles" size={12} color={C.primary} style={{ marginBottom: 4 }} />
             )}
             <Text style={[s.chatBubbleText, msg.role === 'user' && s.chatBubbleTextUser]}>
               {msg.content}
@@ -434,7 +435,7 @@ export default function InsightsScreen() {
 
         {chatLoading && (
           <View style={[s.chatBubble, s.chatBubbleAI]}>
-            <ActivityIndicator size="small" color="#34d399" />
+            <ActivityIndicator size="small" color={C.primary} />
           </View>
         )}
       </View>
@@ -466,68 +467,68 @@ export default function InsightsScreen() {
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0f172a' },
+  container: { flex: 1, backgroundColor: C.bg },
   content: { padding: 16, paddingTop: 60, paddingBottom: 60 },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 },
-  title: { fontSize: 26, fontWeight: '700', color: '#f1f5f9', marginBottom: 2 },
-  subtitle: { fontSize: 13, color: '#64748b' },
-  goalsBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#1e293b', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 7 },
-  goalsBtnText: { fontSize: 12, color: '#fbbf24', fontWeight: '600' },
-  errorCard: { backgroundColor: '#1e293b', borderRadius: 10, padding: 14, flexDirection: 'row', alignItems: 'flex-start', marginBottom: 14, borderLeftWidth: 3, borderLeftColor: '#f87171' },
-  errorText: { fontSize: 13, color: '#f87171', flex: 1 },
-  section: { backgroundColor: '#1e293b', borderRadius: 14, padding: 16, marginBottom: 14 },
+  title: { fontSize: 26, fontWeight: '700', color: C.textBright, marginBottom: 2 },
+  subtitle: { fontSize: 13, color: C.textTertiary },
+  goalsBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: C.bgCard, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 7, borderWidth: 1, borderColor: C.border },
+  goalsBtnText: { fontSize: 12, color: C.warning, fontWeight: '600' },
+  errorCard: { backgroundColor: C.bgCard, borderRadius: 10, padding: 14, flexDirection: 'row', alignItems: 'flex-start', marginBottom: 14, borderLeftWidth: 3, borderLeftColor: C.danger, borderWidth: 1, borderColor: C.border },
+  errorText: { fontSize: 13, color: C.danger, flex: 1 },
+  section: { backgroundColor: C.bgCard, borderRadius: 14, padding: 16, marginBottom: 14, borderWidth: 1, borderColor: C.border },
   sectionHeaderRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
-  sectionTitle: { fontSize: 15, fontWeight: '700', color: '#f1f5f9' },
-  sectionDesc: { fontSize: 13, color: '#64748b', marginBottom: 14, lineHeight: 18 },
+  sectionTitle: { fontSize: 15, fontWeight: '700', color: C.textBright },
+  sectionDesc: { fontSize: 13, color: C.textTertiary, marginBottom: 14, lineHeight: 18 },
   recoveryRing: { alignItems: 'center', paddingVertical: 16 },
   recoveryScore: { fontSize: 64, fontWeight: '800' },
-  recoveryLabel: { fontSize: 13, color: '#64748b', marginTop: 4 },
+  recoveryLabel: { fontSize: 13, color: C.textTertiary, marginTop: 4 },
   recoveryBadge: { marginTop: 8, paddingHorizontal: 14, paddingVertical: 5, borderRadius: 20 },
   recoveryStatus: { fontSize: 13, fontWeight: '700' },
-  targetsBox: { backgroundColor: '#0f172a', borderRadius: 10, padding: 12, marginBottom: 12, gap: 10 },
+  targetsBox: { backgroundColor: C.bgInset, borderRadius: 10, padding: 12, marginBottom: 12, gap: 10 },
   targetRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  targetLabel: { fontSize: 14, color: '#94a3b8', flex: 1 },
+  targetLabel: { fontSize: 14, color: C.textSecondary, flex: 1 },
   targetValue: { fontSize: 14, fontWeight: '700' },
-  workoutBox: { backgroundColor: '#0f172a', borderRadius: 10, padding: 12, marginBottom: 12 },
-  workoutLabel: { fontSize: 11, fontWeight: '700', color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 },
-  workoutText: { fontSize: 14, color: '#e2e8f0', lineHeight: 20 },
-  aiMessageBox: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#334155' },
-  aiMessageText: { fontSize: 14, color: '#94a3b8', flex: 1, lineHeight: 20 },
-  headlineText: { fontSize: 12, color: '#475569', marginTop: 8, textAlign: 'center' },
+  workoutBox: { backgroundColor: C.bgInset, borderRadius: 10, padding: 12, marginBottom: 12 },
+  workoutLabel: { fontSize: 11, fontWeight: '700', color: C.textTertiary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 },
+  workoutText: { fontSize: 14, color: C.textDefault, lineHeight: 20 },
+  aiMessageBox: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, paddingTop: 12, borderTopWidth: 1, borderTopColor: C.border },
+  aiMessageText: { fontSize: 14, color: C.textSecondary, flex: 1, lineHeight: 20 },
+  headlineText: { fontSize: 12, color: C.textMuted, marginTop: 8, textAlign: 'center' },
   emptyBrief: { alignItems: 'center', gap: 10, paddingVertical: 30 },
-  emptyBriefText: { fontSize: 14, color: '#475569' },
-  aiTextBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, marginLeft: 'auto', backgroundColor: '#0f172a', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 5 },
+  emptyBriefText: { fontSize: 14, color: C.textMuted },
+  aiTextBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, marginLeft: 'auto', backgroundColor: C.bgInset, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 5 },
   aiTextBtnDone: { opacity: 0.5 },
-  aiTextBtnLabel: { fontSize: 12, fontWeight: '600', color: '#34d399' },
+  aiTextBtnLabel: { fontSize: 12, fontWeight: '600', color: C.primary },
   loadingBox: { alignItems: 'center', gap: 12, paddingVertical: 24 },
-  loadingText: { fontSize: 13, color: '#64748b' },
-  btn: { backgroundColor: '#34d399', borderRadius: 10, padding: 13, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6, marginBottom: 14 },
+  loadingText: { fontSize: 13, color: C.textTertiary },
+  btn: { backgroundColor: C.primary, borderRadius: 10, padding: 13, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6, marginBottom: 14 },
   btnPurple: { backgroundColor: '#7c3aed' },
   btnDisabled: { opacity: 0.6 },
-  btnText: { fontSize: 15, fontWeight: '700', color: '#0f172a' },
-  insightCard: { backgroundColor: '#0f172a', borderRadius: 10, padding: 14 },
-  insightMeta: { fontSize: 11, color: '#475569', marginBottom: 10, fontWeight: '600' },
-  insightText: { fontSize: 14, color: '#e2e8f0', lineHeight: 24 },
-  modelBadge: { flexDirection: 'row', alignItems: 'center', marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#334155' },
-  modelText: { fontSize: 11, color: '#475569' },
-  deepCard: { backgroundColor: '#0f172a', borderRadius: 10, padding: 14 },
-  deepHeadline: { fontSize: 14, fontWeight: '700', color: '#f1f5f9', marginBottom: 14 },
+  btnText: { fontSize: 15, fontWeight: '700', color: C.bg },
+  insightCard: { backgroundColor: C.bgInset, borderRadius: 10, padding: 14 },
+  insightMeta: { fontSize: 11, color: C.textMuted, marginBottom: 10, fontWeight: '600' },
+  insightText: { fontSize: 14, color: C.textDefault, lineHeight: 24 },
+  modelBadge: { flexDirection: 'row', alignItems: 'center', marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderTopColor: C.border },
+  modelText: { fontSize: 11, color: C.textMuted },
+  deepCard: { backgroundColor: C.bgInset, borderRadius: 10, padding: 14 },
+  deepHeadline: { fontSize: 14, fontWeight: '700', color: C.textBright, marginBottom: 14 },
   deepSection: { marginBottom: 16 },
-  deepSectionTitle: { fontSize: 12, fontWeight: '700', color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 },
+  deepSectionTitle: { fontSize: 12, fontWeight: '700', color: C.textTertiary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 },
   deepItem: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginBottom: 8 },
-  deepBullet: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#a78bfa', marginTop: 6 },
-  deepItemText: { fontSize: 14, color: '#e2e8f0', flex: 1, lineHeight: 20 },
+  deepBullet: { width: 6, height: 6, borderRadius: 3, backgroundColor: C.weight, marginTop: 6 },
+  deepItemText: { fontSize: 14, color: C.textDefault, flex: 1, lineHeight: 20 },
   // Chat
   chatSuggestions: { gap: 8, marginBottom: 4 },
-  suggestionChip: { backgroundColor: '#0f172a', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8, alignSelf: 'flex-start' },
-  suggestionText: { fontSize: 13, color: '#64748b' },
+  suggestionChip: { backgroundColor: C.bgInset, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8, alignSelf: 'flex-start' },
+  suggestionText: { fontSize: 13, color: C.textTertiary },
   chatBubble: { borderRadius: 14, padding: 12, marginBottom: 8, maxWidth: '90%' },
   chatBubbleUser: { backgroundColor: '#1d4ed8', alignSelf: 'flex-end' },
-  chatBubbleAI: { backgroundColor: '#0f172a', alignSelf: 'flex-start' },
-  chatBubbleText: { fontSize: 14, color: '#e2e8f0', lineHeight: 20 },
+  chatBubbleAI: { backgroundColor: C.bgInset, alignSelf: 'flex-start' },
+  chatBubbleText: { fontSize: 14, color: C.textDefault, lineHeight: 20 },
   chatBubbleTextUser: { color: '#fff' },
-  chatInputBar: { flexDirection: 'row', alignItems: 'flex-end', gap: 10, padding: 12, paddingBottom: 28, backgroundColor: '#1e293b', borderTopWidth: 1, borderTopColor: '#334155' },
-  chatInput: { flex: 1, backgroundColor: '#0f172a', borderRadius: 20, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 10, fontSize: 14, color: '#f1f5f9', maxHeight: 100 },
-  chatSendBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#34d399', alignItems: 'center', justifyContent: 'center' },
-  chatSendBtnDisabled: { backgroundColor: '#1e293b' },
+  chatInputBar: { flexDirection: 'row', alignItems: 'flex-end', gap: 10, padding: 12, paddingBottom: 28, backgroundColor: C.bgCard, borderTopWidth: 1, borderTopColor: C.border },
+  chatInput: { flex: 1, backgroundColor: C.bgInset, borderRadius: 20, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 10, fontSize: 14, color: C.textBright, maxHeight: 100 },
+  chatSendBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: C.primary, alignItems: 'center', justifyContent: 'center' },
+  chatSendBtnDisabled: { backgroundColor: C.bgCard },
 });

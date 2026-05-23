@@ -5,19 +5,20 @@ import { useHealthData } from '../../src/hooks/useHealthData';
 import { loadGoals } from '../../src/services/GoalsService';
 import { HealthGoals, DEFAULT_GOALS } from '../../src/models/Goals';
 import { HealthSnapshot } from '../../src/models/HealthSnapshot';
+import { C } from '../../constants/Theme';
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 function sleepColor(hours: number, goal: number): string {
-  if (hours >= goal * 0.95) return '#34d399';       // green — on target
-  if (hours >= goal * 0.8) return '#fbbf24';        // yellow — a bit short
-  return '#f87171';                                  // red — significantly short
+  if (hours >= goal * 0.95) return C.success;
+  if (hours >= goal * 0.8) return C.warning;
+  return C.danger;
 }
 
 function scoreColor(score: number): string {
-  if (score >= 75) return '#34d399';
-  if (score >= 55) return '#fbbf24';
-  return '#f87171';
+  if (score >= 75) return C.success;
+  if (score >= 55) return C.warning;
+  return C.danger;
 }
 
 interface SleepAnalysis {
@@ -221,28 +222,28 @@ function StatChip({ label, value, color }: { label: string; value: string; color
 
 const bar = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
-  dayLabel: { width: 32, fontSize: 12, color: '#64748b' },
-  track: { flex: 1, height: 12, backgroundColor: '#334155', borderRadius: 6, overflow: 'visible', position: 'relative' },
+  dayLabel: { width: 32, fontSize: 12, color: C.textTertiary },
+  track: { flex: 1, height: 12, backgroundColor: C.bgElevated, borderRadius: 6, overflow: 'visible', position: 'relative' },
   fill: { height: 12, borderRadius: 6 },
-  goalLine: { position: 'absolute', top: -3, width: 2, height: 18, backgroundColor: '#475569', borderRadius: 1 },
+  goalLine: { position: 'absolute', top: -3, width: 2, height: 18, backgroundColor: C.textMuted, borderRadius: 1 },
   hoursLabel: { width: 38, fontSize: 12, fontWeight: '600', textAlign: 'right' },
 });
 
 const stat = StyleSheet.create({
-  chip: { backgroundColor: '#1e293b', borderRadius: 10, padding: 12, flex: 1, alignItems: 'center' },
-  label: { fontSize: 11, color: '#64748b', marginBottom: 4 },
+  chip: { backgroundColor: C.bgCard, borderRadius: 10, padding: 12, flex: 1, alignItems: 'center', borderWidth: 1, borderColor: C.border },
+  label: { fontSize: 11, color: C.textTertiary, marginBottom: 4 },
   value: { fontSize: 18, fontWeight: '700' },
 });
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0f172a' },
+  container: { flex: 1, backgroundColor: C.bg },
   content: { padding: 16, paddingTop: 60, paddingBottom: 40 },
-  title: { fontSize: 26, fontWeight: '700', color: '#f1f5f9', marginBottom: 2 },
-  subtitle: { fontSize: 14, color: '#64748b', marginBottom: 16 },
-  card: { backgroundColor: '#1e293b', borderRadius: 14, padding: 16, marginBottom: 16 },
+  title: { fontSize: 26, fontWeight: '700', color: C.textBright, marginBottom: 2 },
+  subtitle: { fontSize: 14, color: C.textTertiary, marginBottom: 16 },
+  card: { backgroundColor: C.bgCard, borderRadius: 14, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: C.border, borderTopWidth: 2, borderTopColor: C.sleep },
   statsRow: { flexDirection: 'row', gap: 8, marginBottom: 20 },
-  sectionTitle: { fontSize: 13, fontWeight: '600', color: '#64748b', marginBottom: 12, textTransform: 'uppercase', letterSpacing: 0.5 },
+  sectionTitle: { fontSize: 13, fontWeight: '600', color: C.textTertiary, marginBottom: 12, textTransform: 'uppercase', letterSpacing: 0.5 },
   insightRow: { flexDirection: 'row', gap: 10, marginBottom: 14, alignItems: 'flex-start' },
-  insightText: { flex: 1, fontSize: 14, color: '#cbd5e1', lineHeight: 22 },
-  empty: { fontSize: 14, color: '#475569', textAlign: 'center', paddingVertical: 20 },
+  insightText: { flex: 1, fontSize: 14, color: C.textDefault, lineHeight: 22 },
+  empty: { fontSize: 14, color: C.textMuted, textAlign: 'center', paddingVertical: 20 },
 });

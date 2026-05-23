@@ -1,13 +1,15 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View, Text, ScrollView, TextInput, TouchableOpacity,
   StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from 'expo-router';
 import { useHealthStore } from '../../src/store/healthStore';
 import { loadGoals, loadRecentIngredients, addRecentIngredients } from '../../src/services/GoalsService';
 import { generateMealIdeas } from '../../src/services/LLMService';
 import { HealthGoals, DEFAULT_GOALS, adjustedTargets } from '../../src/models/Goals';
+import { C } from '../../constants/Theme';
 
 export default function MealsScreen() {
   const { snapshots } = useHealthStore();
@@ -26,6 +28,23 @@ export default function MealsScreen() {
     loadGoals().then(setGoals);
     loadRecentIngredients().then(setRecentIngredients);
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      const fridgeItems = useHealthStore.getState().fridgeIngredients;
+      if (fridgeItems.length > 0) {
+        setIngredients(prev => {
+          const merged = [...prev];
+          fridgeItems.forEach(item => {
+            const trimmed = item.trim().toLowerCase();
+            if (trimmed && !merged.includes(trimmed)) merged.push(trimmed);
+          });
+          return merged;
+        });
+        useHealthStore.getState().clearFridgeIngredients();
+      }
+    }, []),
+  );
 
   function addIngredient(name: string) {
     const trimmed = name.trim().toLowerCase();
@@ -214,67 +233,67 @@ export default function MealsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0f172a' },
+  container: { flex: 1, backgroundColor: C.bg },
   content: { padding: 16, paddingTop: 60, paddingBottom: 40 },
-  title: { fontSize: 26, fontWeight: '700', color: '#f1f5f9', marginBottom: 4 },
-  subtitle: { fontSize: 14, color: '#64748b', marginBottom: 14, lineHeight: 20 },
+  title: { fontSize: 26, fontWeight: '700', color: C.textBright, marginBottom: 4 },
+  subtitle: { fontSize: 14, color: C.textTertiary, marginBottom: 14, lineHeight: 20 },
 
   contextBanner: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: '#1e293b', borderRadius: 10, padding: 12, marginBottom: 14,
+    backgroundColor: C.bgCard, borderRadius: 10, padding: 12, marginBottom: 14, borderWidth: 1, borderColor: C.border,
   },
   contextBannerActive: { borderLeftWidth: 3, borderLeftColor: '#fb923c' },
-  contextText: { fontSize: 13, color: '#64748b', flex: 1, lineHeight: 18 },
+  contextText: { fontSize: 13, color: C.textTertiary, flex: 1, lineHeight: 18 },
   contextTextActive: { color: '#fb923c' },
 
   inputRow: { flexDirection: 'row', gap: 8, marginBottom: 14 },
   input: {
-    flex: 1, backgroundColor: '#1e293b', borderRadius: 10, padding: 12,
-    fontSize: 14, color: '#f1f5f9', borderWidth: 1, borderColor: '#334155',
+    flex: 1, backgroundColor: C.bgCard, borderRadius: 10, padding: 12,
+    fontSize: 14, color: C.textBright, borderWidth: 1, borderColor: C.border,
   },
   addButton: {
-    backgroundColor: '#34d399', borderRadius: 10, width: 46, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: C.primary, borderRadius: 10, width: 46, alignItems: 'center', justifyContent: 'center',
   },
 
   chipSection: { marginBottom: 14 },
-  chipSectionLabel: { fontSize: 11, fontWeight: '600', color: '#475569', letterSpacing: 0.8, marginBottom: 8 },
+  chipSectionLabel: { fontSize: 11, fontWeight: '600', color: C.textMuted, letterSpacing: 0.8, marginBottom: 8 },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chipActive: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#34d399', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6,
+    backgroundColor: C.primary, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6,
   },
-  chipActiveText: { fontSize: 13, fontWeight: '600', color: '#0f172a' },
+  chipActiveText: { fontSize: 13, fontWeight: '600', color: C.bg },
   chipRecent: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: '#1e293b', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 6,
-    borderWidth: 1, borderColor: '#334155',
+    backgroundColor: C.bgCard, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 6,
+    borderWidth: 1, borderColor: C.border,
   },
-  chipRecentText: { fontSize: 13, color: '#94a3b8' },
+  chipRecentText: { fontSize: 13, color: C.textSecondary },
 
   generateButton: {
-    backgroundColor: '#34d399', borderRadius: 12, paddingVertical: 14,
+    backgroundColor: C.primary, borderRadius: 12, paddingVertical: 14,
     alignItems: 'center', justifyContent: 'center', marginBottom: 14,
   },
   generateButtonDisabled: { opacity: 0.5 },
-  generateButtonText: { fontSize: 16, fontWeight: '700', color: '#0f172a' },
+  generateButtonText: { fontSize: 16, fontWeight: '700', color: C.bg },
 
   errorCard: {
-    flexDirection: 'row', backgroundColor: '#1e293b', borderRadius: 10, padding: 12,
-    marginBottom: 14, borderLeftWidth: 3, borderLeftColor: '#f87171',
+    flexDirection: 'row', backgroundColor: C.bgCard, borderRadius: 10, padding: 12,
+    marginBottom: 14, borderLeftWidth: 3, borderLeftColor: C.danger, borderWidth: 1, borderColor: C.border,
   },
-  errorText: { fontSize: 13, color: '#f87171', flex: 1 },
+  errorText: { fontSize: 13, color: C.danger, flex: 1 },
 
-  resultsCard: { backgroundColor: '#1e293b', borderRadius: 14, padding: 18, marginBottom: 14 },
+  resultsCard: { backgroundColor: C.bgCard, borderRadius: 14, padding: 18, marginBottom: 14, borderWidth: 1, borderColor: C.border },
   resultsHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
-  resultsHeaderText: { fontSize: 15, fontWeight: '700', color: '#f1f5f9' },
-  resultsText: { fontSize: 14, color: '#cbd5e1', lineHeight: 24 },
+  resultsHeaderText: { fontSize: 15, fontWeight: '700', color: C.textBright },
+  resultsText: { fontSize: 14, color: C.textDefault, lineHeight: 24 },
   modelBadge: {
     flexDirection: 'row', alignItems: 'center',
-    marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#334155',
+    marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderTopColor: C.border,
   },
-  modelBadgeText: { fontSize: 11, color: '#475569' },
+  modelBadgeText: { fontSize: 11, color: C.textMuted },
 
   emptyState: { alignItems: 'center', marginTop: 40, gap: 12, paddingHorizontal: 24 },
-  emptyTitle: { fontSize: 17, fontWeight: '600', color: '#94a3b8' },
-  emptyText: { fontSize: 14, color: '#475569', textAlign: 'center', lineHeight: 22 },
+  emptyTitle: { fontSize: 17, fontWeight: '600', color: C.textSecondary },
+  emptyText: { fontSize: 14, color: C.textMuted, textAlign: 'center', lineHeight: 22 },
 });

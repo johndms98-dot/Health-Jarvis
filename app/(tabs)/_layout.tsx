@@ -1,19 +1,20 @@
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-
-const ACTIVE = '#34d399';
-const INACTIVE = '#475569';
-const BG = '#0a111e';
-const BORDER = '#1e293b';
+import { C } from '../../constants/Theme';
 
 export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarStyle: { backgroundColor: BG, borderTopColor: BORDER, borderTopWidth: 1 },
-        tabBarActiveTintColor: ACTIVE,
-        tabBarInactiveTintColor: INACTIVE,
+        tabBarStyle: {
+          backgroundColor: C.bg,
+          borderTopColor: C.border,
+          borderTopWidth: 1,
+          paddingTop: 2,
+        },
+        tabBarActiveTintColor: C.primary,
+        tabBarInactiveTintColor: C.textMuted,
         tabBarLabelStyle: { fontSize: 10, fontWeight: '600' },
       }}
     >
@@ -36,6 +37,13 @@ export default function TabLayout() {
         options={{
           title: 'Nutrition',
           tabBarIcon: ({ color, size }) => <Ionicons name="nutrition" size={size} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="fridge"
+        options={{
+          title: 'Fridge',
+          tabBarIcon: ({ color, size }) => <Ionicons name="snow-outline" size={size} color={color} />,
         }}
       />
       <Tabs.Screen
