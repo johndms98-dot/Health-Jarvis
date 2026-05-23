@@ -61,9 +61,6 @@
       "eas": {
         "projectId": "297aff51-a853-4427-a14c-6831ba16beae"
       }
-    },
-    "devClient": {
-      "silentLaunch": false
     }
   }
 }
